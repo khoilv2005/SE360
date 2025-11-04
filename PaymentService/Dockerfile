@@ -1,20 +1,41 @@
-# 1. Chọn image Python
-FROM python:3.11-slim
+# Multi-stage build for optimized image size
+FROM python:3.11-slim AS builder
 
-# 2. Đặt thư mục làm việc bên trong container
 WORKDIR /app
 
-# 3. Sao chép CHỈ file requirements.txt vào trước
+# Copy only requirements first for better caching
 COPY requirements.txt .
 
-# 4. Cài đặt các thư viện (làm bước này riêng để tận dụng cache)
-RUN pip install --no-cache-dir -r requirements.txt
+# Install dependencies to user directory for multi-stage build
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# 5. Sao chép TOÀN BỘ code (main.py, crud.py...) vào
+# Final stage
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy dependencies from builder stage
+COPY --from=builder /root/.local /root/.local
+
+# Copy application code
 COPY . .
 
-# 6. Mở cổng 8000 (cổng mặc định của uvicorn)
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
+
+# Add local bin to PATH
+ENV PATH=/root/.local/bin:$PATH
+
+# Expose port
 EXPOSE 8000
 
-# 7. Lệnh để chạy ứng dụng
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()" || exit 1
+
+# Run application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

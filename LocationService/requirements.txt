@@ -2,5 +2,6 @@
 fastapi
 uvicorn[standard]
 redis
+pydantic-settings
 python-dotenv
 azure-identity
