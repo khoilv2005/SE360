@@ -78,17 +78,42 @@ def read_root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Kubernetes probes"""
+    """Enhanced health check endpoint for Kubernetes probes"""
+    from datetime import datetime
+    import time
+
+    start_time = time.time()
+    health_status = {
+        "status": "healthy",
+        "service": "driverservice",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "checks": {}
+    }
+
     try:
         from database import db
+        db_start = time.time()
         await db.command("ping")
-        return {
-            "status": "healthy",
-            "service": "driverservice",
-            "database": "connected"
+        db_latency = (time.time() - db_start) * 1000  # Convert to ms
+
+        health_status["checks"]["database"] = {
+            "status": "connected",
+            "type": "CosmosDB (MongoDB)",
+            "latency_ms": round(db_latency, 2)
         }
+
+        health_status["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
+        return health_status
+
     except Exception as e:
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        health_status["status"] = "unhealthy"
+        health_status["checks"]["database"] = {
+            "status": "disconnected",
+            "error": str(e)
+        }
+        raise HTTPException(status_code=503, detail=health_status)
 
 
 @app.post("/drivers/", response_model=schemas.DriverResponse, status_code=status.HTTP_201_CREATED)

@@ -17,19 +17,43 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint for Kubernetes probes"""
+    """Enhanced health check endpoint for Kubernetes probes"""
+    from datetime import datetime
+    import time
+
+    start_time = time.time()
+    health_status = {
+        "status": "healthy",
+        "service": "locationservice",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat(),
+        "checks": {}
+    }
+
     try:
         import crud
         # Test Redis connection
+        db_start = time.time()
         result = await crud.redis_client.ping()
-        return {
-            "status": "healthy",
-            "service": "locationservice",
-            "database": "connected" if result else "disconnected"
+        db_latency = (time.time() - db_start) * 1000  # Convert to ms
+
+        health_status["checks"]["database"] = {
+            "status": "connected" if result else "disconnected",
+            "type": "Redis",
+            "latency_ms": round(db_latency, 2)
         }
+
+        health_status["response_time_ms"] = round((time.time() - start_time) * 1000, 2)
+        return health_status
+
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        logger.error(f"Health check failed: {e}", exc_info=True)
+        health_status["status"] = "unhealthy"
+        health_status["checks"]["database"] = {
+            "status": "disconnected",
+            "error": str(e)
+        }
+        raise HTTPException(status_code=503, detail=health_status)
 
 class TripConnectionManager:
     def __init__(self):
