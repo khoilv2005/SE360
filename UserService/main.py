@@ -192,14 +192,25 @@ async def root():
     return {"service": "UIT-Go User Service (PostgreSQL)", "status": "running"}
 
 @app.get("/health")
-async def health_check(db: AsyncSession = Depends(get_db)):
-    """Enhanced health check endpoint for Kubernetes probes"""
+async def health_check():
+    """Simple liveness check - does NOT check database"""
+    from datetime import datetime
+    return {
+        "status": "healthy",
+        "service": "userservice",
+        "version": "1.0.0",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+@app.get("/health/ready")
+async def readiness_check(db: AsyncSession = Depends(get_db)):
+    """Readiness check with database connectivity - for Kubernetes readiness probe"""
     from datetime import datetime
     import time
 
     start_time = time.time()
     health_status = {
-        "status": "healthy",
+        "status": "ready",
         "service": "userservice",
         "version": "1.0.0",
         "timestamp": datetime.utcnow().isoformat(),
@@ -222,8 +233,8 @@ async def health_check(db: AsyncSession = Depends(get_db)):
         return health_status
 
     except Exception as e:
-        logger.error(f"Health check failed: {e}", exc_info=True)
-        health_status["status"] = "unhealthy"
+        logger.error(f"Readiness check failed: {e}", exc_info=True)
+        health_status["status"] = "not_ready"
         health_status["checks"]["database"] = {
             "status": "disconnected",
             "error": str(e)
