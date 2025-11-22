@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: uitgo-app           # Tên ứng dụng trong ArgoCD
+  namespace: argocd         # Namespace nơi ArgoCD đang chạy
+spec:
+  project: default          # Project mặc định của ArgoCD
+
+  # --- SOURCE (Nguồn dữ liệu) ---
+  source:
+    # Repository URL: Link tới kho chứa code của bạn
+    repoURL: 'https://github.com/luuquanghuy-ui/se360-uit-go.git'
+    # Target Revision: Nhánh Git muốn theo dõi (Branch)
+    targetRevision: main
+    # Path: Thư mục chứa các file YAML Kubernetes (Deployment, Service...)
+    path: k8s
+
+  # --- DESTINATION (Đích đến) ---
+  destination:
+    # Server: Địa chỉ API Server nội bộ của Cluster hiện tại
+    server: https://kubernetes.default.svc
+    # Namespace: Nơi các Microservices (User, Trip...) sẽ được tạo ra
+    namespace: default
+
+  # --- SYNC POLICY (Chính sách đồng bộ) ---
+  syncPolicy:
+    automated:
+      prune: true       # Tự động xóa resource trên K8s nếu file trên Git bị xóa
+      selfHeal: true    # Tự động sửa lại nếu ai đó sửa tay trên Cluster (Drift Correction)
+    syncOptions:
+      - CreateNamespace=true # Tự tạo namespace đích nếu chưa có

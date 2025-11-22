@@ -20,26 +20,25 @@ WORKDIR /app
 # Install curl for health checks
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy dependencies from builder stage
-COPY --from=builder /root/.local /root/.local
+# 1. TẠO USER TRƯỚC KHI COPY (Để có user mà gán quyền)
+RUN useradd -m -u 1000 appuser
+
+# 2. COPY THƯ VIỆN VÀO THƯ MỤC CỦA APPUSER (Thay vì /root)
+COPY --from=builder --chown=appuser:appuser /root/.local /home/appuser/.local
 
 # Copy application code
-COPY . .
-
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
+COPY --chown=appuser:appuser . .
 
 # Switch to non-root user
 USER appuser
 
-# Add local bin to PATH
-ENV PATH=/root/.local/bin:$PATH
+# 3. CẬP NHẬT ĐƯỜNG DẪN MỚI
+ENV PATH=/home/appuser/.local/bin:$PATH
 
 # Expose port
 EXPOSE 8000
 
-# Health check endpoint - using curl with longer start period
+# Health check endpoint
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 

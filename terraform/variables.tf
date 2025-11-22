@@ -1,7 +1,7 @@
 variable "prefix" {
   description = "Tiền tố cho tất cả tài nguyên (ví dụ: uitgo)"
   type        = string
-  default     = "uitgo"
+  default     = "huytest"
 }
 
 variable "location" {
