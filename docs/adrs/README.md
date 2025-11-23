@@ -6,7 +6,6 @@ This directory contains Architecture Decision Records documenting significant ar
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [ADR-001](ADR-001-modsecurity-over-app-gateway.md) | ModSecurity WAF over Azure Application Gateway | Accepted | 2025-11-23 |
 | [ADR-002](ADR-002-vnet-service-endpoints.md) | VNet Service Endpoints over Private Endpoints | Accepted | 2025-11-23 |
 | [ADR-003](ADR-003-k8s-native-secrets.md) | Kubernetes Native Secrets over Azure Key Vault | Accepted | 2025-11-23 |
 | [ADR-004](ADR-004-oss-security-tools.md) | OSS Security Tools over Commercial Solutions | Accepted | 2025-11-23 |

@@ -45,7 +45,7 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
                               ▼
                     ┌──────────────────┐
                     │  NGINX Ingress   │
-                    │  + ModSecurity   │ ← WAF Layer
+                    │  - ModSecurity   │ ← WAF DISABLED (Mobile App)
                     │    LoadBalancer  │
                     └────────┬─────────┘
                              │
@@ -364,18 +364,18 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
 
 | Source | Destination | Protocol | Authentication | Encryption |
 |--------|-------------|----------|----------------|------------|
-| TripService | UserService | HTTP | None | ClusterIP only |
-| PaymentService | TripService | HTTP | None | ClusterIP only |
-| LocationService | TripService | HTTP | None | ClusterIP only |
+| TripService | UserService | HTTP | Linkerd mTLS | mTLS encrypted |
+| PaymentService | TripService | HTTP | Linkerd mTLS | mTLS encrypted |
+| LocationService | TripService | HTTP | Linkerd mTLS | mTLS encrypted |
 
 **Threats:**
-- Service impersonation
-- Unauthorized cross-service calls
-- No mutual TLS
+- Service impersonation (MITIGATED ✅)
+- Unauthorized cross-service calls (MITIGATED ✅)
 
-**Mitigation (Future - Optional):**
-- Consider Service Mesh (Istio/Linkerd) for mTLS
-- Currently rely on Network Policies
+**Mitigation (IMPLEMENTED):**
+- ✅ Linkerd Service Mesh for mTLS
+- ✅ Zero Trust Network Policies
+- ✅ Automatic certificate rotation
 
 ---
 

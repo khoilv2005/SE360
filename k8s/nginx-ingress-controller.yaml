@@ -146,14 +146,7 @@ metadata:
 data:
   allow-snippet-annotations: "true"
   
-  # ================================================
-  # MODSECURITY WAF CONFIGURATION (DISABLED)
-  # ================================================
-  enable-modsecurity: "false"
-  enable-owasp-modsecurity-crs: "false"
-  
-  # ModSecurity snippet removed - WAF is disabled
----
+  ---
 apiVersion: networking.k8s.io/v1
 kind: IngressClass
 metadata:

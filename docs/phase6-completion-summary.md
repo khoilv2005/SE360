@@ -6,15 +6,15 @@
 
 Created comprehensive ADRs documenting all major security and architectural decisions:
 
-1. **ADR-001: ModSecurity WAF over Azure Application Gateway**
-   - **Decision:** ModSecurity (FREE) instead of App Gateway WAF ($275-455/mo)
-   - **Savings:** $3,300-5,460/year
-   - **Rationale:** Equivalent security, full control, no vendor lock-in
-
-2. **ADR-002: VNet Service Endpoints over Private Endpoints**
+1. **ADR-002: VNet Service Endpoints over Private Endpoints**
    - **Decision:** Service Endpoints (FREE) instead of Private Endpoints ($45/mo)
    - **Savings:** $540/year
    - **Rationale:** Equivalent security for same-VNet architecture
+
+2. **ADR-003: Linkerd Service Mesh over Istio**
+   - **Decision:** Linkerd (FREE, lightweight) instead of Istio (complex, resource-heavy)
+   - **Savings:** Reduced infrastructure costs, simpler operations
+   - **Rationale:** Rust-based proxies, better performance, easier to operate
 
 3. **ADR-004: Open Source Security Tools over Commercial Solutions**
    - **Decision:** 6 OSS tools (FREE) instead of commercial platforms ($230-800/mo)
@@ -38,13 +38,13 @@ All ADRs follow standard format:
 
 | Decision | Commercial Cost | OSS Cost | Annual Savings |
 |----------|----------------|----------|----------------|
-| WAF | $275-455/mo | $0 | $3,300-5,460 |
+| Service Mesh (Istio) | Complex setup cost | $0 | Reduced ops cost |
 | Private connectivity | $45/mo | $0 | $540 |
 | CI/CD security tools | $230-800/mo | $0 | $2,760-9,600 |
 | Key Vault Premium | $5/mo | $0 (K8s native) | $60 |
-| **TOTAL** | **$555-1,305/mo** | **$0/mo** | **$6,660-15,660** |
+| **TOTAL** | **$280-850/mo** | **$0/mo** | **$3,360-10,200** |
 
-**Average Annual Savings: ~$11,160** 💰
+**Average Annual Savings: ~$6,780** 💰
 
 ---
 

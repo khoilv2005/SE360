@@ -39,7 +39,7 @@ Created 7 production-ready alerts covering infrastructure, performance, availabi
    - Severity: High
 
 7. **Security Events Alert**
-   - ModSecurity block spike detection (>10 in 5min)
+   - Service mesh mTLS failure detection (>10 in 5min)
    - Log Analytics query-based
    - Severity: High
 
@@ -63,7 +63,7 @@ Created 7 production-ready alerts covering infrastructure, performance, availabi
 - Runs on every node automatically
 
 **Log Sources:**
-- ✅ NGINX Ingress Controller (ModSecurity WAF logs)
+- ✅ NGINX Ingress Controller (access logs)
 - ✅ UserService
 - ✅ TripService
 - ✅ DriverService
@@ -81,10 +81,10 @@ Created 7 production-ready alerts covering infrastructure, performance, availabi
 - Uses workspace credentials from K8s secrets
 - TLS encrypted transmission
 
-**ModSecurity Parser:**
-- Custom regex parser for WAF logs
-- Extracts severity and messages
-- Enables security event correlation
+**Application Parser:**
+- Custom regex parser for application logs
+- Extracts service names and log levels
+- Enables log aggregation and correlation
 
 ---
 
@@ -104,10 +104,10 @@ Created 6 incident response procedures:
    - Common causes: OOM, liveness probe, DB connection
    - Remediation: Increase limits, fix permissions, verify secrets
 
-3. **ModSecurity WAF Block Spike**
-   - Investigation: Audit logs, attack patterns, IPs
-   - Attack types: SQLi, XSS, scanners
-   - Remediation: Tune rules or block IPs permanently
+3. **Service Mesh mTLS Failure Spike**
+   - Investigation: Linkerd logs, connection failures, certificates
+   - Common causes: Certificate rotation, network policies, service restarts
+   - Remediation: Restart services, check network policies, verify Linkerd health
 
 4. **Database Connection Failures**
    - Investigation: Test connectivity, check NSGs, verify endpoints
@@ -220,11 +220,11 @@ az monitor log-analytics query \
 
 ### Application Monitoring
 - ✅ All 5 service logs aggregated
-- ✅ ModSecurity WAF logs parsed
+- ✅ Application logs parsed by service
 - ✅ API errors and exceptions
 
 ### Security Monitoring
-- ✅ WAF block spike detection
+- ✅ Service mesh mTLS failure detection
 - ✅ Failed login tracking
 - ✅ Anomalous traffic patterns
 
@@ -238,7 +238,7 @@ With runbooks in place:
 |------------|-------------------|-----------------|------------|
 | High CPU | ~5 min | ~10 min | ~15 min |
 | Pod Restart | ~3 min | ~10 min | ~13 min |
-| WAF Block Spike | ~5 min | Immediate | ~5 min |
+| Service Mesh mTLS Failure | ~5 min | ~10 min | ~15 min |
 | DB Connection | ~10 min | ~15 min | ~25 min |
 
 **Target MTTR: <30 minutes** ✅ Achieved

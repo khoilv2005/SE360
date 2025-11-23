@@ -55,7 +55,11 @@ spec:
             name: uitgo-secrets
         env:
         - name: REDIS_URL
-          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: REDIS_CONNECTION_STRING } }
+          value: "redis://$(REDIS_HOST):6379"
+        - name: REDIS_HOST
+          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: REDIS_HOST } }
+        - name: REDIS_KEY
+          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: REDIS_KEY } }
       
       # VOLUMES
       volumes:

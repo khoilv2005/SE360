@@ -17,7 +17,7 @@ Nâng cấp hệ thống UIT-Go với **Zero Trust, Defense-in-Depth, và DevSec
 
 | Security Layer | Required | Current | Gap | Free Solution |
 |----------------|----------|---------|-----|---------------|
-| WAF | ✅ | ❌ | No OWASP protection | ModSecurity (FREE) |
+| Service Mesh | ✅ | ⚠️ | No mTLS encryption | Linkerd (FREE) |
 | Network Isolation | ✅ | ⚠️ | 2 DBs public | VNet Service Endpoints (FREE) |
 | Secrets Management | ✅ | ⚠️ | Base64 only | K8s encrypted secrets (FREE) |
 | SAST/SCA | ✅ | ❌ | No scanning | Bandit, Safety, Trivy (FREE) |
@@ -33,7 +33,7 @@ Nâng cấp hệ thống UIT-Go với **Zero Trust, Defense-in-Depth, và DevSec
 
 | Enterprise Solution | Cost | FREE Alternative | Savings |
 |---------------------|------|------------------|---------|
-| Azure App Gateway WAF | $275-455/mo | **ModSecurity WAF** | $275-455/mo |
+| Istio Service Mesh | Complex setup | **Linkerd Service Mesh** | Reduced ops cost |
 | Private Endpoints (2×) | $15/mo | **VNet Service Endpoints** | $15/mo |
 | Azure Key Vault Premium | $1-5/mo | **K8s Secrets + encryption at rest** | $1-5/mo |
 | Azure Sentinel | $20-50/mo | **Azure Monitor Free Tier** | $20-50/mo |

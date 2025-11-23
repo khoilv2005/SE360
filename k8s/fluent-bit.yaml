@@ -73,13 +73,12 @@ data:
         Refresh_Interval  5
 
     # ================================================
-    # FILTER: Parse ModSecurity logs
+    # FILTER: Application logs processing
     # ================================================
     [FILTER]
         Name                parser
-        Match               nginx.ingress
+        Match               app.*
         Key_Name            log
-        Parser              modsecurity
         Reserve_Data        On
         Preserve_Key        On
 
@@ -119,9 +118,9 @@ data:
         Time_Keep   On
 
     [PARSER]
-        Name        modsecurity
+        Name        application
         Format      regex
-        Regex       ^.*ModSecurity: (?<severity>[A-Z]+) (?<message>.*)$
+        Regex       ^.*\[?\] (?<level>INFO|WARN|ERROR) (?<service>\w+) (?<message>.*)$
         Time_Key    time
         Time_Format %d/%b/%Y:%H:%M:%S %z
 ---

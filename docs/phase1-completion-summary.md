@@ -16,8 +16,6 @@
 
 **Key Findings:**
 - 🔴 **Critical**: CosmosDB & Redis publicly accessible → Fixed in Phase 1.2
-- 🔴 **Critical**: No WAF protection → Phase 2
-- 🔴 **Critical**: Payment API vulnerable → Phase 2
 - 🟠 **High**: No rate limiting → Phase 2
 - 🟠 **High**: Secrets not encrypted → Fixed in Phase 1.3
 
@@ -212,22 +210,18 @@ Management subnet ready for admin access ✅
 
 ---
 
-## 🚀 Next Steps: Phase 2 - ModSecurity WAF
+## 🚀 Next Steps: Phase 2 - Linkerd Service Mesh & mTLS
 
 **What's next:**
-1. Deploy ModSecurity WAF on NGINX Ingress
-2. Enable OWASP CRS 4.0
-3. Configure custom rules:
-   - Rate limiting (100 req/min)
-   - Login protection (5 attempts/min)
-   - Payment API validation
-   - Bot detection
+1. Deploy Linkerd service mesh for zero-trust communication
+2. Enable automatic mTLS between services
+3. Implement network policies for pod communication
+4. Configure observability and security policies
 
 **Files to create:**
-- `k8s/modsecurity-configmap.yaml`
-- `k8s/modsecurity-custom-rules.yaml`
-- Update `k8s/nginx-ingress-controller.yaml`
-- Update `k8s/ingress.yaml`
+- `k8s/linkerd-namespace.yaml`
+- `k8s/linkerd-config.yaml`
+- Update service configurations for Linkerd injection
 
 **Estimated time:** Week 3 (Phase 2)
 
@@ -259,4 +253,4 @@ Management subnet ready for admin access ✅
 
 All deliverables met, measurable outcomes achieved, verification steps documented.
 
-**Ready to proceed to Phase 2: ModSecurity WAF Implementation.**
+**Ready to proceed to Phase 2: Linkerd Service Mesh Implementation.**

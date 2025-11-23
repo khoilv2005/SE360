@@ -6,7 +6,7 @@ Incident response procedures for common security events.
 
 1. [High CPU Alert](#runbook-1-high-cpu-alert)
 2. [Pod Restart Loop](#runbook-2-pod-restart-loop)
-3. [ModSecurity WAF Block Spike](#runbook-3-modsecurity-waf-block-spike)
+3. [Service Mesh mTLS Failure Spike](#runbook-3-service-mesh-mtls-failure-spike)
 4. [Database Connection Failures](#runbook-4-database-connection-failures)
 5. [Suspicious Login Activity](#runbook-5-suspicious-login-activity)
 6. [Container Image Vulnerability](#runbook-6-container-image-vulnerability)
@@ -51,7 +51,7 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep ModSecu
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "429\|403"
 
 # Add IP block rule if needed (emergency)
-kubectl edit cm modsecurity-custom-rules -n ingress-nginx
+kubectl edit cm  -n ingress-nginx
 # Add: SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:900999,phase:1,deny,status:403"
 ```
 
@@ -142,26 +142,33 @@ If >5 pods in CrashLoopBackOff: Priority 1 incident
 
 ---
 
-## Runbook 3: ModSecurity WAF Block Spike
+## Runbook 3: Service Mesh mTLS Failure Spike
 
-**Trigger:** >10 blocks in 5 minutes  
-**Severity:** High  
+**Trigger:** >10 mTLS connection failures in 5 minutes
+**Severity:** High
 **Alert:** `security-events-alert`
 
 ### Investigation Steps
 
 ```bash
-# 1. View recent blocks
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep ModSecurity | tail -50
+# 1. Check Linkerd control plane status
+linkerd check
 
-# 2. Identify attack pattern
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "id:900" | grep blocked
+# 2. View recent connection failures
+kubectl logs -n linkerd deployment/linkerd-controller | grep -i error | tail -50
 
-# 3. Check blocked IPs
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep blocked | awk '{print $1}' | sort | uniq -c | sort -rn
+# 3. Check data plane proxy status
+kubectl get pods -n linkerd
 
-# 4. View audit log
-kubectl exec -n ingress-nginx deployment/ingress-nginx-controller -- tail -100 /var/log/modsec_audit.log
+# 4. View service mesh edges
+linkerd edges deploy --all-namespaces
+
+# 5. Check certificate status
+kubectl get certificates -n linkerd
+
+# 6. Check specific service connectivity
+kubectl port-forward -n linkerd service/linkerd-controller 8080:8080 &
+curl http://localhost:8080/metrics | grep failure
 ```
 
 ### Attack Types
@@ -192,7 +199,7 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "id:900
 # Add exception in ingress.yaml
 kubectl edit ingress uitgo-ingress
 # Add annotation:
-#   nginx.ingress.kubernetes.io/modsecurity-snippet: |
+#   nginx.ingress.kubernetes.io/ |
 #     SecRuleRemoveById 942100
 ```
 
@@ -203,7 +210,7 @@ kubectl edit ingress uitgo-ingress
 
 # If persistent attack from single IP
 # Add permanent block
-kubectl edit cm modsecurity-custom-rules -n ingress-nginx
+kubectl edit cm  -n ingress-nginx
 # Add: SecRule REMOTE_ADDR "@ipMatch <ATTACKER_IP>" "id:900998,phase:1,deny,status:403"
 kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
 ```
@@ -305,7 +312,7 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "/api/u
 # Blocked automatically after threshold
 
 # If attack persists, add IP block
-kubectl edit cm modsecurity-custom-rules -n ingress-nginx
+kubectl edit cm  -n ingress-nginx
 # Add to custom rules
 kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
 ```

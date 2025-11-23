@@ -399,8 +399,7 @@ ServiceName/
 
 ## Architecture Decision Records (ADRs)
 
-Key architectural decisions are documented in the `docs/adrs/` directory, including:
-- [ADR-001: ModSecurity WAF Implementation](docs/adrs/ADR-001-modsecurity-over-app-gateway.md)
+Key architectural decisions are documented in the `docs/adrs/ directory, including:
 - [ADR-002: Database Selection Strategy](docs/adrs/ADR-002-database-selection.md)
 - [ADR-003: Authentication Framework](docs/adrs/ADR-003-authentication-strategy.md)
 - [ADR-004: OSS Security Tools Integration](docs/adrs/ADR-004-oss-security-tools.md)

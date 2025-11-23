@@ -5,7 +5,7 @@ UIT-Go là nền tảng gọi xe được xây dựng với kiến trúc microse
 ## 📚 Tài liệu hệ thống
 
 - **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Kiến trúc microservices, sơ đồ luồng nghiệp vụ, giao tiếp giữa các service
-- **[plan.md](docs/plan.md)**: Kế hoạch Module C - Security (DevSecOps), Zero Trust architecture, WAF, CI/CD security
+- **[plan.md](docs/plan.md)**: Kế hoạch Module C - Security (DevSecOps), Zero Trust architecture, Service Mesh, CI/CD security
 - **[ENV.sample](docs/ENV.sample)**: Template file môi trường
 
 ## 🏗️ Kiến trúc hệ thống
@@ -154,7 +154,7 @@ Azure Load Balancer (Public IP)
 │    • /api/locations/* → LocationService              │
 │    • /api/payments/*  → PaymentService               │
 │    • /ws              → LocationService (WebSocket)  │
-│  - Future: + ModSecurity WAF                         │
+│  - Future: + Linkerd Service Mesh                    │
 └──────────────────────────────────────────────────────┘
    │
    ▼
