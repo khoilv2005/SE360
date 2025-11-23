@@ -32,6 +32,21 @@ resource "azurerm_network_security_rule" "aks_allow_https_inbound" {
   network_security_group_name = azurerm_network_security_group.aks_nsg.name
 }
 
+resource "azurerm_network_security_rule" "aks_allow_lb_inbound" {
+  name                        = "AllowAzureLoadBalancerInbound"
+  priority                    = 105
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = "AzureLoadBalancer"
+  destination_address_prefix  = "172.16.1.0/24"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.aks_nsg.name
+  description                 = "Allow Azure Load Balancer health probes"
+}
+
 resource "azurerm_network_security_rule" "aks_deny_all_inbound" {
   name                        = "DenyAllInbound"
   priority                    = 4096
