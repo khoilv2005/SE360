@@ -542,8 +542,10 @@ jobs:
           exit 1
         fi
 
-        echo "TARGET_URL=http://$INGRESS_IP" >> $GITHUB_ENV
-        echo "✅ Targeting: http://$INGRESS_IP"
+        # Target the User Service API endpoint instead of root
+        TARGET_URL="http://$INGRESS_IP/api/users"
+        echo "TARGET_URL=$TARGET_URL" >> $GITHUB_ENV
+        echo "✅ Targeting: $TARGET_URL"
     
     - name: Run OWASP ZAP Baseline Scan
       run: |
@@ -575,11 +577,12 @@ jobs:
 
         # Run OWASP ZAP scan with better error handling and debugging
         echo "Starting ZAP scan with command:"
-        echo "docker run --rm -v \$(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-baseline.py -t \"${{ env.TARGET_URL }}\" -r zap-baseline-report.html -J zap-baseline-report.json -w zap-baseline-report.md --no_fail_on_warn"
+        echo "docker run --rm -v \$(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t \"${{ env.TARGET_URL }}\" -r zap-baseline-report.html -J zap-baseline-report.json -w zap-baseline-report.md --no_fail_on_warn"
 
         docker run --rm \
           -v $(pwd):/zap/wrk/:rw \
-          owasp/zap2docker-stable zap-baseline.py \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
           -t "${{ env.TARGET_URL }}" \
           -r zap-baseline-report.html \
           -J zap-baseline-report.json \
@@ -619,7 +622,7 @@ jobs:
           fi
 
           echo "Attempting simple ZAP test scan..."
-          docker run --rm owasp/zap2docker-stable zap-baseline.py -t "https://httpbin.org" --no_fail_on_warn || echo "Even httpbin scan failed"
+          docker run --rm ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t "https://httpbin.org" --no_fail_on_warn || echo "Even httpbin scan failed"
         fi
       continue-on-error: true  # Don't fail build on DAST findings (report only)
     
