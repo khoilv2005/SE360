@@ -145,6 +145,59 @@ metadata:
   namespace: ingress-nginx
 data:
   allow-snippet-annotations: "true"
+  
+  # ================================================
+  # MODSECURITY WAF CONFIGURATION
+  # ================================================
+  enable-modsecurity: "true"
+  enable-owasp-modsecurity-crs: "true"
+  
+  # ModSecurity snippet with OWASP CRS 4.0
+  modsecurity-snippet: |
+    # Start in DetectionOnly mode initially (switch to On after tuning)
+    SecRuleEngine DetectionOnly
+    
+    # Request body handling
+    SecRequestBodyAccess On
+    SecRequestBodyLimit 13107200        # 12.5 MB
+    SecRequestBodyNoFilesLimit 131072   # 128 KB
+    SecRequestBodyInMemoryLimit 131072
+    
+    # Response body handling
+    SecResponseBodyAccess On
+    SecResponseBodyLimit 524288         # 512 KB
+    SecResponseBodyLimitAction ProcessPartial
+    
+    # Audit logging
+    SecAuditEngine RelevantOnly
+    SecAuditLogRelevantStatus "^(?:5|4(?!04))"
+    SecAuditLogParts ABIJDEFHZ
+    SecAuditLogType Serial
+    SecAuditLog /var/log/modsec_audit.log
+    
+    # Include OWASP CRS 4.0
+    Include /etc/nginx/owasp-modsecurity-crs/nginx-modsecurity.conf
+    Include /etc/nginx/owasp-modsecurity-crs/crs-setup.conf
+    Include /etc/nginx/owasp-modsecurity-crs/rules/*.conf
+    
+    # OWASP CRS Configuration
+    SecAction \
+      "id:900000,\
+      phase:1,\
+      nolog,\
+      pass,\
+      t:none,\
+      setvar:tx.paranoia_level=2,\
+      setvar:tx.anomaly_score_threshold=5,\
+      setvar:tx.inbound_anomaly_score_threshold=5,\
+      setvar:tx.outbound_anomaly_score_threshold=4"
+    
+    # Skip ModSecurity for static files (performance optimization)
+    SecRule REQUEST_URI "@beginsWith /static" \
+      "id:900200,phase:1,pass,nolog,ctl:ruleEngine=Off"
+    
+    SecRule REQUEST_URI "@rx \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$" \
+      "id:900201,phase:1,pass,nolog,ctl:ruleEngine=Off"
 ---
 apiVersion: networking.k8s.io/v1
 kind: IngressClass

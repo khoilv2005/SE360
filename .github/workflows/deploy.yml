@@ -46,11 +46,167 @@ jobs:
       continue-on-error: false # Dừng lại nếu test fail
 
   # ----------------------------------------------
-  #  GIAI ĐOẠN 2: BUILD (CI)
+  #  PHASE 3: SECURITY SCANNING (DevSecOps)
+  # ----------------------------------------------
+  
+  # NEW JOB 1: SAST (Static Application Security Testing)
+  sast:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Bandit
+      run: pip install bandit[toml]
+    
+    - name: Run Bandit SAST
+      run: |
+        echo "🔍 Running SAST scan on all Python services..."
+        bandit -r UserService/ TripService/ DriverService/ LocationService/ PaymentService/ \
+          -f json -o bandit-report.json || true
+        echo ""
+        echo "📊 High severity issues:"
+        bandit -r UserService/ TripService/ DriverService/ LocationService/ PaymentService/ -ll
+      continue-on-error: false
+    
+    - name: Upload SAST results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: bandit-sast-report
+        path: bandit-report.json
+
+  # NEW JOB 2: Dependency Scanning
+  dependency-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Safety
+      run: pip install safety
+    
+    - name: Scan dependencies for vulnerabilities
+      run: |
+        echo "🔍 Scanning dependencies for known vulnerabilities..."
+        for service in UserService TripService DriverService LocationService PaymentService; do
+          echo ""
+          echo "📦 Scanning $service..."
+          safety check -r $service/requirements.txt --json --output ${service}-safety.json || true
+          safety check -r $service/requirements.txt || true
+        done
+      continue-on-error: false
+    
+    - name: Upload dependency scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: safety-dependency-reports
+        path: '*-safety.json'
+
+  # NEW JOB 3: Secrets Scanning
+  secrets-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Full history for TruffleHog
+    
+    - name: Run TruffleHog secrets scanner
+      run: |
+        echo "🔍 Scanning for exposed secrets in git history..."
+        docker run --rm -v "$PWD:/pwd" trufflesecurity/trufflehog:latest \
+          filesystem /pwd --json --fail > trufflehog-report.json || true
+        
+        # Check if secrets found
+        if [ -s trufflehog-report.json ]; then
+          echo "❌ SECRETS DETECTED! Check trufflehog-report.json"
+          cat trufflehog-report.json
+          exit 1
+        else
+          echo "✅ No secrets detected"
+        fi
+      continue-on-error: false
+    
+    - name: Upload secrets scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trufflehog-secrets-report
+        path: trufflehog-report.json
+
+  # NEW JOB 4: IaC (Infrastructure as Code) Scanning  
+  iac-scan:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Checkov
+      run: pip install checkov
+    
+    - name: Scan Terraform files
+      run: |
+        echo "🔍 Scanning Terraform configs for security issues..."
+        checkov -d terraform/ \
+          --framework terraform \
+          --output json \
+          --output-file checkov-terraform-report.json \
+          --soft-fail || true
+        
+        echo ""
+        echo "📊 Terraform scan summary:"
+        checkov -d terraform/ --framework terraform --compact
+      continue-on-error: false
+    
+    - name: Scan Kubernetes manifests
+      run: |
+        echo ""
+        echo "🔍 Scanning Kubernetes manifests..."
+        checkov -d k8s/ \
+          --framework kubernetes \
+          --output json \
+          --output-file checkov-k8s-report.json \
+          --soft-fail || true
+        
+        echo ""
+        echo "📊 Kubernetes scan summary:"
+        checkov -d k8s/ --framework kubernetes --compact
+      continue-on-error: false
+    
+    - name: Upload IaC scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: checkov-iac-reports
+        path: checkov-*.json
+
+  # ----------------------------------------------
+  #  GIAI ĐOẠN 2: BUILD (CI) - Now depends on security scans
   # ----------------------------------------------
   build:
     runs-on: ubuntu-latest
-    needs: test # Phải chờ 'test' thành công
+    needs: [test, sast, dependency-scan, secrets-scan, iac-scan] # Wait for all security scans
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
@@ -89,6 +245,45 @@ jobs:
       run: |
         docker build ./UserService -t ${{ env.ACR_NAME }}.azurecr.io/userservice:${{ github.sha }}
         docker push ${{ env.ACR_NAME }}.azurecr.io/userservice:${{ github.sha }}
+    
+    # NEW: Container Security Scanning with Trivy
+    - name: Scan all container images with Trivy
+      run: |
+        echo "🔍 Scanning container images for vulnerabilities..."
+        
+        # Install Trivy
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee -a /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update
+        sudo apt-get install trivy -y
+        
+        # Scan all service images
+        for service in locationservice tripservice driverservice paymentservice userservice; do
+          echo ""
+          echo "📦 Scanning $service..."
+          trivy image \
+            --severity HIGH,CRITICAL \
+            --exit-code 0 \
+            --format json \
+            --output trivy-${service}.json \
+            ${{ env.ACR_NAME }}.azurecr.io/${service}:${{ github.sha }} || true
+          
+          # Show summary
+          trivy image \
+            --severity HIGH,CRITICAL \
+            ${{ env.ACR_NAME }}.azurecr.io/${service}:${{ github.sha }}
+        done
+        
+        echo ""
+        echo "✅ Container scanning complete"
+      continue-on-error: false
+    
+    - name: Upload Trivy scan results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: trivy-container-reports
+        path: trivy-*.json
 
   # ----------------------------------------------
   #  GIAI ĐOẠN 3: DEPLOY (CD)
@@ -262,3 +457,63 @@ jobs:
       run: |
         python tests/smoke_test.py
 
+  # ----------------------------------------------
+  #  PHASE 3: DAST (Dynamic Application Security Testing)
+  # ----------------------------------------------
+  dast:
+    runs-on: ubuntu-latest
+    needs: smoke_test
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+    
+    - name: Get Ingress IP
+      run: |
+        echo "Getting Ingress LoadBalancer IP for DAST scan..."
+        # Authenticate to Azure
+        echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+        az login --service-principal -u $(jq -r .clientId azure_creds.json) -p $(jq -r .clientSecret azure_creds.json) --tenant $(jq -r .tenantId azure_creds.json)
+        
+        # Set AKS context
+        az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
+        
+        # Get Ingress IP
+        INGRESS_IP=$(kubectl get service ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        echo "TARGET_URL=http://$INGRESS_IP" >> $GITHUB_ENV
+        echo "Targeting: http://$INGRESS_IP"
+    
+    - name: Run OWASP ZAP Baseline Scan
+      run: |
+        echo "🔍 Running OWASP ZAP DAST scan on deployed application..."
+        docker run --rm \
+          -v $(pwd):/zap/wrk/:rw \
+          owasp/zap2docker-stable zap-baseline.py \
+          -t ${{ env.TARGET_URL }} \
+          -r zap-baseline-report.html \
+          -J zap-baseline-report.json \
+          -w zap-baseline-report.md || true
+        
+        echo "✅ DAST scan complete"
+      continue-on-error: true  # Don't fail build on DAST findings (report only)
+    
+    - name: Upload OWASP ZAP Report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: zap-dast-report
+        path: |
+          zap-baseline-report.html
+          zap-baseline-report.json
+          zap-baseline-report.md
+    
+    - name: Display DAST Summary
+      if: always()
+      run: |
+        echo ""
+        echo "📊 DAST Scan Summary"
+        echo "===================="
+        if [ -f zap-baseline-report.md ]; then
+          cat zap-baseline-report.md
+        else
+          echo "Report not generated"
+        fi

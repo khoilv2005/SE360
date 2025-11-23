@@ -12,29 +12,62 @@ spec:
       labels:
         app: driverservice
     spec:
+      # POD SECURITY CONTEXT
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: driverservice
-        image: acruitgoprod.azurecr.io/driverservice:latest # CI/CD sẽ thay
+        image: acruitgoprod.azurecr.io/driverservice:latest
         ports:
         - containerPort: 8000
+        
+        # CONTAINER SECURITY CONTEXT  
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # RESOURCE LIMITS
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # VOLUME MOUNTS
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        
         envFrom:
         - secretRef:
             name: uitgo-secrets
         env:
         - name: MONGODB_URL
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: COSMOS_CONNECTION_STRING } }
-        - name: LOCATION_SERVICE_URL
-          value: "http://locationservice:8000"
-        - name: PAYMENT_SERVICE_URL
-          value: "http://paymentservice:8000"
-        - name: SECRET_KEY # Đổi tên thành JWT_SECRET_KEY nếu code của bạn dùng tên đó
-          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: JWT_SECRET_KEY } }
+      
+      # VOLUMES
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: driverservice # Service nội bộ
+  name: driverservice
 spec:
+  type: ClusterIP
   ports:
   - port: 8000
     targetPort: 8000

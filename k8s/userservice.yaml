@@ -12,16 +12,59 @@ spec:
       labels:
         app: userservice
     spec:
+      # ================================================
+      # POD SECURITY CONTEXT (Phase 4: Application Hardening)
+      # ================================================
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: userservice
         image: acruitgoprod.azurecr.io/userservice:latest # CI/CD sẽ thay
         ports:
         - containerPort: 8000
+        
+        # ================================================
+        # CONTAINER SECURITY CONTEXT
+        # ================================================
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # ================================================
+        # RESOURCE LIMITS
+        # ================================================
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # ================================================
+        # VOLUME MOUNTS (for read-only filesystem)
+        # ================================================
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        
+        # ================================================
+        # ENVIRONMENT VARIABLES
+        # ================================================
         envFrom:
         - secretRef:
             name: uitgo-secrets
         env:
-        # Code của bạn cần xây dựng chuỗi kết nối từ 4 biến này
         - name: POSTGRES_HOST
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: POSTGRES_HOST } }
         - name: POSTGRES_USER
@@ -34,17 +77,24 @@ spec:
           value: "30"
         - name: DRIVER_SERVICE_URL
           value: "http://driverservice:8000"
-        - name: SECRET_KEY # Đổi tên thành JWT_SECRET_KEY nếu code của bạn dùng tên đó
+        - name: SECRET_KEY
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: JWT_SECRET_KEY } }
+      
+      # ================================================
+      # VOLUMES
+      # ================================================
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: userservice
 spec:
-  type: ClusterIP # Service này sẽ có IP nội bộ để truy cập từ các Pod khác
+  type: ClusterIP
   ports:
-  - port: 80 # Cổng public
-    targetPort: 8000 # Cổng container
+  - port: 80
+    targetPort: 8000
   selector:
     app: userservice

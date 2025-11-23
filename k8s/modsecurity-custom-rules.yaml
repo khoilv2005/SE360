@@ -1,0 +1,275 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: modsecurity-custom-rules
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+data:
+  # ================================================
+  # UIT-Go Custom ModSecurity Rules
+  # OWASP CRS 4.0 + Application-Specific Rules
+  # ================================================
+  
+  custom-rules.conf: |
+    # ================================================
+    # 1. RATE LIMITING
+    # ================================================
+    
+    # Global rate limiting (100 requests per minute per IP)
+    SecAction "id:900100,\
+      phase:1,\
+      nolog,\
+      pass,\
+      initcol:ip=%{REMOTE_ADDR},\
+      setvar:ip.request_count=+1,\
+      expirevar:ip.request_count=60"
+    
+    SecRule IP:REQUEST_COUNT "@gt 100" \
+      "id:900101,\
+      phase:1,\
+      deny,\
+      status:429,\
+      log,\
+      msg:'Rate limit exceeded: More than 100 requests per minute from %{REMOTE_ADDR}',\
+      logdata:'Total requests: %{IP.REQUEST_COUNT}'"
+    
+    # ================================================
+    # 2. AUTHENTICATION ENDPOINT PROTECTION
+    # ================================================
+    
+    # Login rate limiting (5 attempts per minute per IP)
+    SecRule REQUEST_URI "@beginsWith /api/users/login" \
+      "id:900105,\
+      phase:1,\
+      pass,\
+      nolog,\
+      initcol:ip=%{REMOTE_ADDR},\
+      setvar:ip.login_count=+1,\
+      expirevar:ip.login_count=60"
+    
+    SecRule REQUEST_URI "@beginsWith /api/users/login" \
+      "id:900106,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:429,\
+      log,\
+      msg:'Login rate limit exceeded from %{REMOTE_ADDR}',\
+      logdata:'Login attempts: %{IP.LOGIN_COUNT}'"
+      SecRule IP:LOGIN_COUNT "@gt 5"
+    
+    # ================================================
+    # 3. PAYMENT API PROTECTION
+    # ================================================
+    
+    # Strict amount validation for payment requests
+    SecRule REQUEST_URI "@beginsWith /api/payments" \
+      "id:900110,\
+      phase:2,\
+      chain,\
+      deny,\
+      status:400,\
+      log,\
+      msg:'Invalid payment amount format',\
+      logdata:'Amount: %{ARGS.amount}'"
+      SecRule ARGS:amount "!@rx ^[0-9]{1,10}$"
+    
+    # Payment endpoint must use POST only
+    SecRule REQUEST_URI "@beginsWith /api/payments" \
+      "id:900111,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:405,\
+      log,\
+      msg:'Invalid HTTP method for payment endpoint'"
+      SecRule REQUEST_METHOD "!@streq POST"
+    
+    # Require Content-Type for payment requests
+    SecRule REQUEST_URI "@beginsWith /api/payments" \
+      "id:900112,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:400,\
+      log,\
+      msg:'Missing Content-Type header for payment request'"
+      SecRule &REQUEST_HEADERS:Content-Type "@eq 0"
+    
+    # ================================================
+    # 4. MALICIOUS SCANNERS DETECTION
+    # ================================================
+    
+    # Block known malicious User-Agents
+    SecRule REQUEST_HEADERS:User-Agent "@rx (sqlmap|nikto|nmap|nessus|masscan|metasploit|burpsuite|acunetix|w3af|openvas|skipfish)" \
+      "id:900115,\
+      phase:1,\
+      deny,\
+      status:403,\
+      log,\
+      msg:'Malicious security scanner detected',\
+      logdata:'User-Agent: %{REQUEST_HEADERS.User-Agent}'"
+    
+    # Block empty or missing User-Agent (common in bots)
+    SecRule &REQUEST_HEADERS:User-Agent "@eq 0" \
+      "id:900116,\
+      phase:1,\
+      deny,\
+      status:403,\
+      log,\
+      msg:'Missing User-Agent header (likely bot)'"
+    
+    # ================================================
+    # 5. FILE UPLOAD RESTRICTIONS
+    # ================================================
+    
+    # Block dangerous file extensions
+    SecRule REQUEST_FILENAME "@rx \.(php|exe|sh|bat|cmd|ps1|jar|war|asp|aspx|jsp|py|rb|pl)$" \
+      "id:900125,\
+      phase:1,\
+      deny,\
+      status:403,\
+      log,\
+      msg:'Dangerous file extension blocked',\
+      logdata:'Filename: %{REQUEST_FILENAME}'"
+    
+    # Block backup and config files
+    SecRule REQUEST_FILENAME "@rx \.(bak|old|sql|zip|tar|gz|log|conf|config|ini)$" \
+      "id:900126,\
+      phase:1,\
+      deny,\
+      status:403,\
+      log,\
+      msg:'Suspicious file extension blocked',\
+      logdata:'Filename: %{REQUEST_FILENAME}'"
+    
+    # ================================================
+    # 6. WEBSOCKET PROTECTION (/ws endpoint)
+    # ================================================
+    
+    # WebSocket connection rate limiting
+    SecRule REQUEST_URI "@beginsWith /ws" \
+      "id:900130,\
+      phase:1,\
+      pass,\
+      nolog,\
+      initcol:ip=%{REMOTE_ADDR},\
+      setvar:ip.ws_count=+1,\
+      expirevar:ip.ws_count=60"
+    
+    SecRule REQUEST_URI "@beginsWith /ws" \
+      "id:900131,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:429,\
+      log,\
+      msg:'WebSocket connection rate limit exceeded'"
+      SecRule IP:WS_COUNT "@gt 10"
+    
+    # ================================================
+    # 7. GEO-BLOCKING (OPTIONAL - Customize as needed)
+    # ================================================
+    
+    # Uncomment to block specific countries
+    # Example: Block North Korea (KP) and Iran (IR)
+    # SecRule REMOTE_ADDR "@geoLookup" \
+    #   "id:900140,\
+    #   phase:1,\
+    #   chain,\
+    #   deny,\
+    #   status:403,\
+    #   log,\
+    #   msg:'Access denied from blocked country: %{GEO.COUNTRY_CODE}'"
+    #   SecRule GEO:COUNTRY_CODE "@rx ^(KP|IR)$"
+    
+    # ================================================
+    # 8. SUSPICIOUS PATTERNS
+    # ================================================
+    
+    # Block requests with suspicious characters in URL
+    SecRule REQUEST_URI "@rx (\.\./|/\.\.|\\x00|%00|<|>|\||;)" \
+      "id:900150,\
+      phase:1,\
+      deny,\
+      status:400,\
+      log,\
+      msg:'Suspicious characters in URL',\
+      logdata:'URI: %{REQUEST_URI}'"
+    
+    # Block very long URLs (potential buffer overflow)
+    SecRule REQUEST_URI_RAW "@gt 2048" \
+      "id:900151,\
+      phase:1,\
+      deny,\
+      status:414,\
+      log,\
+      msg:'Request URI too long (potential attack)'"
+    
+    # ================================================
+    # 9. API-SPECIFIC PROTECTIONS
+    # ================================================
+    
+    # Enforce JSON Content-Type for API requests
+    SecRule REQUEST_URI "@beginsWith /api/" \
+      "id:900160,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:415,\
+      log,\
+      msg:'Invalid Content-Type for API request'"
+      SecRule REQUEST_METHOD "@rx ^(POST|PUT|PATCH)$" \
+        "chain"
+        SecRule REQUEST_HEADERS:Content-Type "!@contains application/json"
+    
+    # Limit request body size for API endpoints
+    SecRule REQUEST_URI "@beginsWith /api/" \
+      "id:900161,\
+      phase:1,\
+      chain,\
+      deny,\
+      status:413,\
+      log,\
+      msg:'Request body too large'"
+      SecRule REQUEST_HEADERS:Content-Length "@gt 10485760"  # 10MB
+    
+    # ================================================
+    # 10. BRUTE FORCE PROTECTION
+    # ================================================
+    
+    # Track failed authentication attempts
+    # This is a simplified version - consider using fail2ban for production
+    SecRule RESPONSE_STATUS "@streq 401" \
+      "id:900170,\
+      phase:5,\
+      pass,\
+      nolog,\
+      initcol:ip=%{REMOTE_ADDR},\
+      setvar:ip.failed_auth=+1,\
+      expirevar:ip.failed_auth=300"
+    
+    # Block after 10 failed attempts in 5 minutes
+    SecRule IP:FAILED_AUTH "@gt 10" \
+      "id:900171,\
+      phase:1,\
+      deny,\
+      status:403,\
+      log,\
+      msg:'Too many failed authentication attempts from %{REMOTE_ADDR}',\
+      logdata:'Failed attempts: %{IP.FAILED_AUTH}'"
+    
+    # ================================================
+    # 11. CUSTOM LOGGING
+    # ================================================
+    
+    # Log all blocked requests for analysis
+    SecRule TX:ANOMALY_SCORE "@ge 5" \
+      "id:900180,\
+      phase:5,\
+      pass,\
+      log,\
+      msg:'Request blocked by ModSecurity',\
+      logdata:'Anomaly Score: %{TX.ANOMALY_SCORE}, IP: %{REMOTE_ADDR}, URI: %{REQUEST_URI}'"

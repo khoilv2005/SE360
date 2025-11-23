@@ -12,25 +12,66 @@ spec:
       labels:
         app: paymentservice
     spec:
+      # POD SECURITY CONTEXT
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: paymentservice
-        image: acruitgoprod.azurecr.io/paymentservice:latest # CI/CD sẽ thay
+        image: acruitgoprod.azurecr.io/paymentservice:latest
         ports:
         - containerPort: 8000
+        
+        # CONTAINER SECURITY CONTEXT
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # RESOURCE LIMITS
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # VOLUME MOUNTS
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        
         envFrom:
         - secretRef:
-            name: uitgo-secrets # Lấy các secret chung (VNPAY)
+            name: uitgo-secrets
         env:
         - name: MONGODB_URL
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: COSMOS_CONNECTION_STRING } }
-        - name: DRIVER_SERVICE_URL
-          value: "http://driverservice:8000"
+        - name: VNPAY_TMN_CODE
+          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: VNPAY_TMN_CODE } }
+        - name: VNPAY_HASH_SECRET
+          valueFrom: { secretKeyRef: { name: uitgo-secrets, key: VNPAY_HASH_SECRET } }
+      
+      # VOLUMES
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: paymentservice # Service nội bộ
+  name: paymentservice
 spec:
+  type: ClusterIP
   ports:
   - port: 8000
     targetPort: 8000

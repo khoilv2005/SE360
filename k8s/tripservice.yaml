@@ -12,37 +12,72 @@ spec:
       labels:
         app: tripservice
     spec:
+      # POD SECURITY CONTEXT
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      
       containers:
       - name: tripservice
-        image: acruitgoprod.azurecr.io/tripservice:latest # CI/CD sẽ thay
+        image: acruitgoprod.azurecr.io/tripservice:latest
         ports:
         - containerPort: 8000
+        
+        # CONTAINER SECURITY CONTEXT
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
+        
+        # RESOURCE LIMITS
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # VOLUME MOUNTS
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        
         envFrom:
         - secretRef:
-            name: uitgo-secrets # Lấy các secret chung (VNPAY, Mapbox, v.v.)
+            name: uitgo-secrets
         env:
-        # Code của bạn chỉ cần đọc biến MONGODB_URL này (đã là connection string của CosmosDB)
         - name: MONGODB_URL
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: COSMOS_CONNECTION_STRING } }
-        # Tên DNS nội bộ của các service K8s
         - name: LOCATION_SERVICE_URL
           value: "http://locationservice:8000"
         - name: DRIVER_SERVICE_URL
           value: "http://driverservice:8000"
         - name: PAYMENT_SERVICE_URL
           value: "http://paymentservice:8000"
-        # Đổi tên biến để khớp với tên K8s Secret
         - name: MY_CLIENT_ID
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: TRIPSVC_CLIENT_ID } }
         - name: MY_CLIENT_SECRET
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: TRIPSVC_CLIENT_SECRET } }
         - name: USER_SERVICE_URL
           valueFrom: { secretKeyRef: { name: uitgo-secrets, key: USER_SERVICE_BASE_URL } }
+      
+      # VOLUMES
+      volumes:
+      - name: tmp
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: tripservice # Service nội bộ
+  name: tripservice
 spec:
   ports:
   - port: 8000
