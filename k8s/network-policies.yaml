@@ -1,0 +1,415 @@
+# ================================================
+# ZERO TRUST NETWORK POLICIES
+# ================================================
+# Network Policies implementing Zero Trust principles
+# Default deny all traffic, then explicitly allow required communications
+# Using 'default' namespace since services are running there
+
+---
+# ================================================
+# DEFAULT DENY ALL POLICY (Zero Trust Foundation)
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress: []
+---
+# ================================================
+# ALLOW DNS RESOLUTION (Required for All Pods)
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+---
+# ================================================
+# ALLOW INGRESS COMMUNICATION FROM NGINX INGRESS
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-to-services
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+---
+# ================================================
+# USER SERVICE POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: userservice-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: userservice
+  policyTypes:
+  - Ingress
+  - Egress
+  # Ingress: Allow traffic from ingress and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+  - from:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 80
+  # Egress: Allow PostgreSQL and communication with other services
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: userservice
+    ports:
+    - protocol: TCP
+      port: 80
+  - to: []  # Allow external PostgreSQL
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# ================================================
+# DRIVER SERVICE POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: driverservice-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: driverservice
+  policyTypes:
+  - Ingress
+  - Egress
+  # Ingress: Allow traffic from ingress and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Egress: Allow MongoDB and communication with other services
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: []  # Allow external MongoDB
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# ================================================
+# TRIP SERVICE POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: tripservice-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: tripservice
+  policyTypes:
+  - Ingress
+  - Egress
+  # Ingress: Allow traffic from ingress and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    - podSelector:
+        matchLabels:
+          app: locationservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Egress: Allow MongoDB, external APIs, and communication with other services
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: []  # Allow external MongoDB
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to: []  # Allow external MapBox API
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    - podSelector:
+        matchLabels:
+          app: locationservice
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# ================================================
+# LOCATION SERVICE POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: locationservice-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: locationservice
+  policyTypes:
+  - Ingress
+  - Egress
+  # Ingress: Allow traffic from ingress and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Egress: Allow Redis, external APIs, and communication with other services
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: locationservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: []  # Allow external Redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []  # Allow external MapBox API
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# ================================================
+# PAYMENT SERVICE POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: paymentservice-netpol
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      app: paymentservice
+  policyTypes:
+  - Ingress
+  - Egress
+  # Ingress: Allow traffic from ingress and other services
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  # Egress: Allow MongoDB, external VNPAY API, and communication with other services
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: paymentservice
+    ports:
+    - protocol: TCP
+      port: 8000
+  - to: []  # Allow external MongoDB
+    ports:
+    - protocol: TCP
+      port: 27017
+  - to: []  # Allow external VNPAY API
+    ports:
+    - protocol: TCP
+      port: 443
+  - to:
+    - podSelector:
+        matchLabels:
+          app: tripservice
+    - podSelector:
+        matchLabels:
+          app: userservice
+    - podSelector:
+        matchLabels:
+          app: driverservice
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# ================================================
+# KUBE-SYSTEM ACCESS POLICY
+# ================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-system-access
+  namespace: default
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443  # Kubernetes API server
