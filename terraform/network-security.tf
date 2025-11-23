@@ -27,7 +27,7 @@ resource "azurerm_network_security_rule" "aks_allow_https_inbound" {
   source_port_range           = "*"
   destination_port_ranges     = ["80", "443"]
   source_address_prefix       = "Internet"
-  destination_address_prefix  = "172.16.1.0/24"
+  destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.rg.name
   network_security_group_name = azurerm_network_security_group.aks_nsg.name
 }
