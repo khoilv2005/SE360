@@ -47,6 +47,21 @@ resource "azurerm_network_security_rule" "aks_allow_lb_inbound" {
   description                 = "Allow Azure Load Balancer health probes"
 }
 
+resource "azurerm_network_security_rule" "aks_allow_vnet_inbound" {
+  name                        = "AllowVnetInbound"
+  priority                    = 110
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "*"
+  source_port_range           = "*"
+  destination_port_range      = "*"
+  source_address_prefix       = "VirtualNetwork"
+  destination_address_prefix  = "VirtualNetwork"
+  resource_group_name         = azurerm_resource_group.rg.name
+  network_security_group_name = azurerm_network_security_group.aks_nsg.name
+  description                 = "Allow internal VNet traffic (required for AKS)"
+}
+
 resource "azurerm_network_security_rule" "aks_deny_all_inbound" {
   name                        = "DenyAllInbound"
   priority                    = 4096
