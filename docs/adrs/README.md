@@ -12,6 +12,7 @@ This directory contains Architecture Decision Records documenting significant ar
 | [ADR-004](ADR-004-oss-security-tools.md) | OSS Security Tools over Commercial Solutions | Accepted | 2025-11-23 |
 | [ADR-005](ADR-005-fluent-bit-over-fluentd.md) | Fluent Bit over Fluentd for Log Aggregation | Accepted | 2025-11-23 |
 | [ADR-006](ADR-006-azure-monitor-free-tier.md) | Azure Monitor FREE Tier for Alerting | Accepted | 2025-11-23 |
+| [ADR-007](ADR-007-zero-trust-implementation.md) | Zero Trust Architecture Implementation | Accepted | 2025-11-23 |
 
 ## ADR Process
 

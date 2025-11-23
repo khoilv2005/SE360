@@ -1,0 +1,285 @@
+# ================================================
+# POD SECURITY ADMISSION (Zero Trust - Defense in Depth)
+# ================================================
+# Implementing Pod Security Standards using native Kubernetes 1.25+ features
+# Enforcing security contexts for all pods according to plan.md requirements
+
+---
+# ================================================
+# POD SECURITY ADMISSION CONFIGURATION
+# ================================================
+apiVersion: apiserver.config.k8s.io/v1
+kind: AdmissionConfiguration
+metadata:
+  name: pod-security-admission
+spec:
+  plugins:
+  - name: PodSecurity
+    configuration:
+      apiVersion: policy/v1beta1
+      kind: PodSecurityConfiguration
+      # Enforce baseline security (controls against obvious privilege escalation)
+      enforce: "baseline:v1.24"
+      # Audit restricted security (comprehensive security controls)
+      audit: "restricted:v1.24"
+      # Warn about restricted security violations
+      warn: "restricted:v1.24"
+      # Exemptions for system namespaces
+      exemptions:
+        namespaces: ["kube-system", "ingress-nginx"]
+        runtimeClasses: []
+        ages: []
+
+---
+# ================================================
+# POD SECURITY POLICY FOR RESTRICTED STANDARDS
+# ================================================
+apiVersion: policy/v1beta1
+kind: PodSecurityConfiguration
+metadata:
+  name: uitgo-restricted
+  namespace: default
+spec:
+  # Control escalation of privileges
+  privileged: false
+  allowPrivilegeEscalation: false
+  defaultAddCapabilities: []
+  requiredDropCapabilities:
+  - ALL
+
+  # Linux capabilities
+  allowedCapabilities: []
+  defaultAddCapabilities: []
+
+  # Host namespaces
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+
+  # File system
+  readOnlyRootFilesystem: true
+
+  # Run as user (Zero Trust principle)
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  runAsGroup:
+    rule: 'MustRunAs'
+    ranges:
+      - min: 1000
+        max: 65535
+
+  # SELinux/AppArmor
+  seLinux:
+    rule: 'RunAsAny'
+
+  # Volumes
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+    - 'ephemeral'
+
+  # Seccomp profile
+  seccomp:
+    profile: 'RuntimeDefault'
+
+---
+# ================================================
+# RESOURCE LIMITS AND REQUESTS (Cost Optimization)
+# ================================================
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: uitgo-resource-limits
+  namespace: default
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "1000m"
+      memory: "1Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container
+
+---
+# ================================================
+# NAMESPACE RESOURCE QUOTA (Cost Controls)
+# ================================================
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: uitgo-resource-quota
+  namespace: default
+spec:
+  hard:
+    requests.cpu: "4000m"
+    requests.memory: "4Gi"
+    limits.cpu: "8000m"
+    limits.memory: "8Gi"
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+    secrets: "20"
+    configmaps: "20"
+    count/persistentvolumeclaims: "5"
+
+---
+# ================================================
+# RBAC FOR POD SECURITY ENFORCEMENT
+# ================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: uitgo-pod-security-enforcer
+rules:
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  verbs: ["use"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: uitgo-pod-security-enforcer-binding
+subjects:
+- kind: ServiceAccount
+  name: uitgo-service-account
+  namespace: default
+roleRef:
+  kind: ClusterRole
+  name: uitgo-pod-security-enforcer
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ================================================
+# SECURE SERVICE ACCOUNT FOR ALL SERVICES
+# ================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: uitgo-secure-sa
+  namespace: default
+  labels:
+    security: zero-trust
+    compliance: restricted
+    purpose: service-identity
+  annotations:
+    pod-security.kubernetes.io/audit: "restricted"
+    pod-security.kubernetes.io/enforce: "baseline"
+    pod-security.kubernetes.io/warn: "restricted"
+
+---
+# ================================================
+# SECURITY CONTEXT CONFIG MAP
+# ================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-context-config
+  namespace: default
+  labels:
+    security: zero-trust
+    config-type: pod-security
+data:
+  security-context.yaml: |
+    # Security context template for Zero Trust compliance
+    securityContext:
+      # Non-root execution (Security principle)
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 3000
+      fsGroup: 2000
+
+      # Seccomp profile (Defense in Depth)
+      seccompProfile:
+        type: RuntimeDefault
+
+      # Read-only root filesystem (Least privilege)
+      readOnlyRootFilesystem: true
+
+      # Capabilities (Zero Trust principle)
+      capabilities:
+        drop:
+          - ALL
+      allowPrivilegeEscalation: false
+
+    # Container-specific security context
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+      runAsNonRoot: true
+      runAsUser: 1000
+
+  audit-checks.yaml: |
+    # Security audit checklist
+    requiredChecks:
+      - nonRootExecution
+      - readOnlyFilesystem
+      - capabilityDropping
+      - seccompProfile
+      - restrictedVolumeTypes
+      - noHostNetwork
+      - noPrivilegedMode
+
+    complianceStandards:
+      - "OWASP Top 10"
+      - "CIS Kubernetes Benchmark"
+      - "NIST SP 800-190"
+      - "Zero Trust Architecture"
+
+---
+# ================================================
+# VALIDATING WEBHOOK FOR SECURITY POLICIES
+# ================================================
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: uitgo-security-validator
+  namespace: default
+  labels:
+    security: zero-trust
+    webhook-type: security-validation
+webhooks:
+  - name: security-validator.example.com
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: ["apps"]
+        apiVersions: ["v1"]
+        resources: ["deployments", "replicasets"]
+    clientConfig:
+      service:
+        name: security-validator-service
+        namespace: default
+        path: "/validate"
+      caBundle: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tZ0RTVVND...  # CA bundle placeholder
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+    failurePolicy: Fail
+    timeoutSeconds: 30
+    objectSelector:
+      matchLabels:
+        security: enforced
