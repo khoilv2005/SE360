@@ -477,17 +477,10 @@ jobs:
           echo "Authenticating to Azure..."
           echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.txt
 
-          # Try to detect if it's JSON or YAML format
-          if echo "${{ secrets.AZURE_CREDENTIALS }}" | head -c 1 | grep -q '{'; then
+          # Try to detect if it's JSON or YAML format by testing with jq directly
+          if echo "${{ secrets.AZURE_CREDENTIALS }}" | jq empty 2>/dev/null; then
             echo "Detected JSON format for Azure credentials"
             echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
-
-            # Validate JSON format
-            if ! jq empty azure_creds.json 2>/dev/null; then
-              echo "❌ Error: AZURE_CREDENTIALS is not valid JSON"
-              echo "Content: $(cat azure_creds.json | head -c 200)..."
-              exit 1
-            fi
 
             # Extract credentials from JSON
             CLIENT_ID=$(jq -r '.clientId // .appId // empty' azure_creds.json)
