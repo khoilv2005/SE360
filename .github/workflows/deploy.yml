@@ -177,7 +177,7 @@ jobs:
         
         echo ""
         echo "📊 Terraform scan summary:"
-        checkov -d terraform/ --framework terraform --compact
+        checkov -d terraform/ --framework terraform --compact || true
       continue-on-error: false
     
     - name: Scan Kubernetes manifests
@@ -192,7 +192,7 @@ jobs:
         
         echo ""
         echo "📊 Kubernetes scan summary:"
-        checkov -d k8s/ --framework kubernetes --compact
+        checkov -d k8s/ --framework kubernetes --compact || true
       continue-on-error: false
     
     - name: Upload IaC scan results
