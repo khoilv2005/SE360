@@ -559,11 +559,24 @@ jobs:
         echo "Scanning target: ${{ env.TARGET_URL }}"
 
         # Test if target is reachable before scanning
-        if ! curl -s --connect-timeout 10 --max-time 30 "${{ env.TARGET_URL }}" > /dev/null; then
+        echo "Testing target reachability..."
+        if curl_response=$(curl -s -w "%{http_code}" --connect-timeout 10 --max-time 30 "${{ env.TARGET_URL }}" 2>/dev/null); then
+          http_code="${curl_response: -3}"
+          response_body="${curl_response%???}"
+          echo "✅ Target is reachable - HTTP $http_code"
+          if [ -n "$response_body" ]; then
+            echo "Response preview: ${response_body:0:100}..."
+          fi
+        else
           echo "⚠️ Warning: Target URL is not reachable, but proceeding with scan anyway..."
+          echo "Debugging connection:"
+          curl -v --connect-timeout 5 --max-time 10 "${{ env.TARGET_URL }}" || echo "Connection failed completely"
         fi
 
-        # Run OWASP ZAP scan with better error handling
+        # Run OWASP ZAP scan with better error handling and debugging
+        echo "Starting ZAP scan with command:"
+        echo "docker run --rm -v \$(pwd):/zap/wrk/:rw owasp/zap2docker-stable zap-baseline.py -t \"${{ env.TARGET_URL }}\" -r zap-baseline-report.html -J zap-baseline-report.json -w zap-baseline-report.md --no_fail_on_warn"
+
         docker run --rm \
           -v $(pwd):/zap/wrk/:rw \
           owasp/zap2docker-stable zap-baseline.py \
@@ -571,21 +584,42 @@ jobs:
           -r zap-baseline-report.html \
           -J zap-baseline-report.json \
           -w zap-baseline-report.md \
-          --no_fail_on_warn || {
-            echo "⚠️ ZAP scan completed with warnings (this is expected)"
-            echo "Check the report for details"
-          }
+          --no_fail_on_warn 2>&1 | tee zap-debug.log
+
+        zap_exit_code=${PIPESTATUS[0]}
+        echo "ZAP exit code: $zap_exit_code"
 
         # Check if reports were generated
+        echo "Checking for generated reports..."
+        ls -la zap-* 2>/dev/null || echo "No zap files found"
+
         if [ -f "zap-baseline-report.html" ]; then
           echo "✅ DAST scan complete - Reports generated:"
           ls -la zap-baseline-report.*
+          echo "HTML report size: $(wc -c < zap-baseline-report.html) bytes"
+
+          # Check if report has content
+          if grep -q "ZAP" zap-baseline-report.html; then
+            echo "✅ HTML report contains ZAP content"
+          else
+            echo "⚠️ HTML report may be empty"
+          fi
         else
           echo "❌ Error: ZAP reports were not generated"
-          echo "Docker output:"
-          docker run --rm \
-            -v $(pwd):/zap/wrk/:rw \
-            owasp/zap2docker-stable zap-baseline.py -t "${{ env.TARGET_URL }}" --no_fail_on_warn || true
+          echo "Debug information:"
+          echo "- Target URL: ${{ env.TARGET_URL }}"
+          echo "- ZAP exit code: $zap_exit_code"
+          echo "- Current directory: $(pwd)"
+          echo "- Directory contents:"
+          ls -la || echo "Cannot list directory"
+
+          if [ -f "zap-debug.log" ]; then
+            echo "ZAP debug output (last 50 lines):"
+            tail -50 zap-debug.log
+          fi
+
+          echo "Attempting simple ZAP test scan..."
+          docker run --rm owasp/zap2docker-stable zap-baseline.py -t "https://httpbin.org" --no_fail_on_warn || echo "Even httpbin scan failed"
         fi
       continue-on-error: true  # Don't fail build on DAST findings (report only)
     
@@ -598,6 +632,7 @@ jobs:
           zap-baseline-report.html
           zap-baseline-report.json
           zap-baseline-report.md
+          zap-debug.log
     
     - name: Display DAST Summary
       if: always()
@@ -605,8 +640,36 @@ jobs:
         echo ""
         echo "📊 DAST Scan Summary"
         echo "===================="
+
+        echo "Target URL: ${{ env.TARGET_URL }}"
+
+        if [ -f zap-baseline-report.html ]; then
+          echo "✅ HTML report generated: zap-baseline-report.html ($(wc -c < zap-baseline-report.html) bytes)"
+        else
+          echo "❌ HTML report not generated"
+        fi
+
+        if [ -f zap-baseline-report.json ]; then
+          echo "✅ JSON report generated: zap-baseline-report.json ($(wc -c < zap-baseline-report.json) bytes)"
+        else
+          echo "❌ JSON report not generated"
+        fi
+
         if [ -f zap-baseline-report.md ]; then
+          echo "✅ Markdown report generated: zap-baseline-report.md ($(wc -c < zap-baseline-report.md) bytes)"
+          echo ""
+          echo "Report content:"
+          echo "=============="
           cat zap-baseline-report.md
         else
-          echo "Report not generated"
+          echo "❌ Markdown report not generated"
+        fi
+
+        if [ -f zap-debug.log ]; then
+          echo "✅ Debug log available: zap-debug.log ($(wc -c < zap-debug.log) bytes)"
+          echo "Last few lines of debug:"
+          echo "======================="
+          tail -10 zap-debug.log
+        else
+          echo "❌ Debug log not generated"
         fi
