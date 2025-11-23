@@ -471,30 +471,96 @@ jobs:
     - name: Get Ingress IP
       run: |
         echo "Getting Ingress LoadBalancer IP for DAST scan..."
-        # Authenticate to Azure
-        echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
-        az login --service-principal -u $(jq -r .clientId azure_creds.json) -p $(jq -r .clientSecret azure_creds.json) --tenant $(jq -r .tenantId azure_creds.json)
-        
-        # Set AKS context
-        az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
-        
+
+        # Check if AZURE_CREDENTIALS is available and valid
+        if [ -n "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+          echo "Authenticating to Azure..."
+          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+
+          # Validate JSON format
+          if ! jq empty azure_creds.json 2>/dev/null; then
+            echo "❌ Error: AZURE_CREDENTIALS is not valid JSON"
+            echo "Content: $(cat azure_creds.json | head -c 200)..."
+            exit 1
+          fi
+
+          # Extract credentials safely
+          CLIENT_ID=$(jq -r '.clientId // .appId // empty' azure_creds.json)
+          CLIENT_SECRET=$(jq -r '.clientSecret // .password // empty' azure_creds.json)
+          TENANT_ID=$(jq -r '.tenantId // .tenant // empty' azure_creds.json)
+
+          # Check if all credentials are available
+          if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$TENANT_ID" ]; then
+            echo "❌ Error: Missing Azure credentials in JSON"
+            echo "Available fields: $(jq -r 'keys[]' azure_creds.json | tr '\n' ', ')"
+            exit 1
+          fi
+
+          # Authenticate to Azure
+          az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
+
+          # Set AKS context
+          az aks get-credentials --resource-group ${{ env.RESOURCE_GROUP_NAME }} --name ${{ env.AKS_CLUSTER_NAME }} --overwrite-existing
+        else
+          echo "⚠️ AZURE_CREDENTIALS not found, trying to use existing kubeconfig..."
+        fi
+
         # Get Ingress IP
-        INGRESS_IP=$(kubectl get service ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+        echo "Getting Ingress service IP..."
+        INGRESS_IP=$(kubectl get service ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+
+        if [ -z "$INGRESS_IP" ]; then
+          echo "❌ Error: Could not get Ingress IP"
+          echo "Available services:"
+          kubectl get svc -A
+          exit 1
+        fi
+
         echo "TARGET_URL=http://$INGRESS_IP" >> $GITHUB_ENV
-        echo "Targeting: http://$INGRESS_IP"
+        echo "✅ Targeting: http://$INGRESS_IP"
     
     - name: Run OWASP ZAP Baseline Scan
       run: |
         echo "🔍 Running OWASP ZAP DAST scan on deployed application..."
+
+        # Check if TARGET_URL is set
+        if [ -z "${{ env.TARGET_URL }}" ]; then
+          echo "❌ Error: TARGET_URL is not set"
+          echo "Skipping DAST scan..."
+          exit 0
+        fi
+
+        echo "Scanning target: ${{ env.TARGET_URL }}"
+
+        # Test if target is reachable before scanning
+        if ! curl -s --connect-timeout 10 --max-time 30 "${{ env.TARGET_URL }}" > /dev/null; then
+          echo "⚠️ Warning: Target URL is not reachable, but proceeding with scan anyway..."
+        fi
+
+        # Run OWASP ZAP scan with better error handling
         docker run --rm \
           -v $(pwd):/zap/wrk/:rw \
           owasp/zap2docker-stable zap-baseline.py \
-          -t ${{ env.TARGET_URL }} \
+          -t "${{ env.TARGET_URL }}" \
           -r zap-baseline-report.html \
           -J zap-baseline-report.json \
-          -w zap-baseline-report.md || true
-        
-        echo "✅ DAST scan complete"
+          -w zap-baseline-report.md \
+          --no_fail_on_warn || {
+            echo "⚠️ ZAP scan completed with warnings (this is expected)"
+            echo "Check the report for details"
+          }
+
+        # Check if reports were generated
+        if [ -f "zap-baseline-report.html" ]; then
+          echo "✅ DAST scan complete - Reports generated:"
+          ls -la zap-baseline-report.*
+        else
+          echo "❌ Error: ZAP reports were not generated"
+          echo "Docker output:"
+          docker run --rm \
+            -v $(pwd):/zap/wrk/:rw \
+            owasp/zap2docker-stable zap-baseline.py -t "${{ env.TARGET_URL }}" --no_fail_on_warn || true
+        fi
       continue-on-error: true  # Don't fail build on DAST findings (report only)
     
     - name: Upload OWASP ZAP Report
