@@ -577,7 +577,7 @@ jobs:
 
         # Run OWASP ZAP scan with better error handling and debugging
         echo "Starting ZAP scan with command:"
-        echo "docker run --rm -v \$(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t \"${{ env.TARGET_URL }}\" -r zap-baseline-report.html -J zap-baseline-report.json -w zap-baseline-report.md --no_fail_on_warn"
+        echo "docker run --rm -v \$(pwd):/zap/wrk/:rw ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t \"${{ env.TARGET_URL }}\" -r zap-baseline-report.html -J zap-baseline-report.json -w zap-baseline-report.md -I"
 
         docker run --rm \
           -v $(pwd):/zap/wrk/:rw \
@@ -587,7 +587,7 @@ jobs:
           -r zap-baseline-report.html \
           -J zap-baseline-report.json \
           -w zap-baseline-report.md \
-          --no_fail_on_warn 2>&1 | tee zap-debug.log
+          -I 2>&1 | tee zap-debug.log
 
         zap_exit_code=${PIPESTATUS[0]}
         echo "ZAP exit code: $zap_exit_code"
@@ -622,7 +622,7 @@ jobs:
           fi
 
           echo "Attempting simple ZAP test scan..."
-          docker run --rm ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t "https://httpbin.org" --no_fail_on_warn || echo "Even httpbin scan failed"
+          docker run --rm ghcr.io/zaproxy/zaproxy:stable zap-baseline.py -t "https://httpbin.org" -I || echo "Even httpbin scan failed"
         fi
       continue-on-error: true  # Don't fail build on DAST findings (report only)
     
