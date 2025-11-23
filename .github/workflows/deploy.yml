@@ -475,26 +475,59 @@ jobs:
         # Check if AZURE_CREDENTIALS is available and valid
         if [ -n "${{ secrets.AZURE_CREDENTIALS }}" ]; then
           echo "Authenticating to Azure..."
-          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+          echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.txt
 
-          # Validate JSON format
-          if ! jq empty azure_creds.json 2>/dev/null; then
-            echo "❌ Error: AZURE_CREDENTIALS is not valid JSON"
-            echo "Content: $(cat azure_creds.json | head -c 200)..."
-            exit 1
+          # Try to detect if it's JSON or YAML format
+          if echo "${{ secrets.AZURE_CREDENTIALS }}" | head -c 1 | grep -q '{'; then
+            echo "Detected JSON format for Azure credentials"
+            echo "${{ secrets.AZURE_CREDENTIALS }}" > azure_creds.json
+
+            # Validate JSON format
+            if ! jq empty azure_creds.json 2>/dev/null; then
+              echo "❌ Error: AZURE_CREDENTIALS is not valid JSON"
+              echo "Content: $(cat azure_creds.json | head -c 200)..."
+              exit 1
+            fi
+
+            # Extract credentials from JSON
+            CLIENT_ID=$(jq -r '.clientId // .appId // empty' azure_creds.json)
+            CLIENT_SECRET=$(jq -r '.clientSecret // .password // empty' azure_creds.json)
+            TENANT_ID=$(jq -r '.tenantId // .tenant // empty' azure_creds.json)
+          else
+            echo "Detected YAML format for Azure credentials, parsing directly..."
+
+            # Extract credentials directly from YAML using grep and sed
+            CLIENT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*clientId:' | sed 's/.*clientId:\s*//' | tr -d ', ')
+            CLIENT_SECRET=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*clientSecret:' | sed 's/.*clientSecret:\s*//' | tr -d ', ')
+            TENANT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*tenantId:' | sed 's/.*tenantId:\s*//' | tr -d ', ')
+
+            # Also try alternative field names
+            if [ -z "$CLIENT_ID" ]; then
+              CLIENT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*appId:' | sed 's/.*appId:\s*//' | tr -d ', ')
+            fi
+            if [ -z "$CLIENT_SECRET" ]; then
+              CLIENT_SECRET=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*password:' | sed 's/.*password:\s*//' | tr -d ', ')
+            fi
+            if [ -z "$TENANT_ID" ]; then
+              TENANT_ID=$(echo "${{ secrets.AZURE_CREDENTIALS }}" | grep -E '^\s*tenant:' | sed 's/.*tenant:\s*//' | tr -d ', ')
+            fi
           fi
-
-          # Extract credentials safely
-          CLIENT_ID=$(jq -r '.clientId // .appId // empty' azure_creds.json)
-          CLIENT_SECRET=$(jq -r '.clientSecret // .password // empty' azure_creds.json)
-          TENANT_ID=$(jq -r '.tenantId // .tenant // empty' azure_creds.json)
 
           # Check if all credentials are available
           if [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$TENANT_ID" ]; then
-            echo "❌ Error: Missing Azure credentials in JSON"
-            echo "Available fields: $(jq -r 'keys[]' azure_creds.json | tr '\n' ', ')"
+            echo "❌ Error: Missing Azure credentials"
+            echo "CLIENT_ID found: ${CLIENT_ID:+YES}"
+            echo "CLIENT_SECRET found: ${CLIENT_SECRET:+YES}"
+            echo "TENANT_ID found: ${TENANT_ID:+YES}"
+            echo "Raw credential format (first 200 chars):"
+            echo "${{ secrets.AZURE_CREDENTIALS }}" | head -c 200
+            echo ""
             exit 1
           fi
+
+          echo "✅ Credentials extracted successfully"
+          echo "CLIENT_ID: ${CLIENT_ID:0:10}..."
+          echo "TENANT_ID: ${TENANT_ID:0:10}..."
 
           # Authenticate to Azure
           az login --service-principal -u "$CLIENT_ID" -p "$CLIENT_SECRET" --tenant "$TENANT_ID"
