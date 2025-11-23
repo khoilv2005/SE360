@@ -76,7 +76,7 @@ jobs:
       continue-on-error: false
     
     - name: Upload SAST results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: bandit-sast-report
@@ -110,7 +110,7 @@ jobs:
       continue-on-error: false
     
     - name: Upload dependency scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: safety-dependency-reports
@@ -143,7 +143,7 @@ jobs:
       continue-on-error: false
     
     - name: Upload secrets scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: trufflehog-secrets-report
@@ -195,7 +195,7 @@ jobs:
       continue-on-error: false
     
     - name: Upload IaC scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: checkov-iac-reports
@@ -279,7 +279,7 @@ jobs:
       continue-on-error: false
     
     - name: Upload Trivy scan results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: trivy-container-reports
@@ -497,7 +497,7 @@ jobs:
       continue-on-error: true  # Don't fail build on DAST findings (report only)
     
     - name: Upload OWASP ZAP Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: zap-dast-report
