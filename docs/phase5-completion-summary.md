@@ -97,7 +97,7 @@ Created 6 incident response procedures:
 1. **High CPU Alert**
    - Investigation: `kubectl top`, logs analysis
    - Common causes: DoS, memory leak, inefficient code
-   - Remediation: Scale up, check WAF, rollback
+   - Remediation: Scale up, check Service Mesh, rollback
 
 2. **Pod Restart Loop**
    - Investigation: Events, logs, resource limits

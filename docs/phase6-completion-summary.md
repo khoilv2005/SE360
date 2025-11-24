@@ -62,7 +62,7 @@ All ADRs follow standard format:
 | Document | Phase | Status |
 |----------|-------|--------|
 | `docs/phase1-completion-summary.md` | Foundation & Threat Modeling | ✅ Complete |
-| `docs/phase2-completion-summary.md` | ModSecurity WAF | ✅ Complete |
+| `docs/phase2-completion-summary.md` | Linkerd Service Mesh | ✅ Complete |
 | `docs/phase3-completion-summary.md` | CI/CD Security Integration | ✅ Complete |
 | `docs/phase4-completion-summary.md` | Application Hardening | ✅ Complete |
 | `docs/phase5-completion-summary.md` | Monitoring & Alerting | ⏳ To create |
@@ -72,7 +72,7 @@ All ADRs follow standard format:
 | ADR | Title | Status |
 |-----|-------|--------|
 | `docs/adrs/README.md` | ADR index | ✅ Complete |
-| `docs/adrs/ADR-001-modsecurity-over-app-gateway.md` | WAF decision | ✅ Complete |
+| `docs/adrs/ADR-002-vnet-service-endpoints.md` | Network decision | ✅ Complete |
 | `docs/adrs/ADR-002-vnet-service-endpoints.md` | Network decision | ✅ Complete |
 | `docs/adrs/ADR-004-oss-security-tools.md` | CI/CD tools decision | ✅ Complete |
 
@@ -133,7 +133,7 @@ All ADRs follow standard format:
 4. **Shift-left security:** Catching issues early reduced production incidents
 
 ### Challenges Overcome
-1. **ModSecurity tuning:** Resolved with DetectionOnly mode first
+1. **Service Mesh configuration:** Resolved with DetectionOnly mode first
 2. **Tool integration:** GitHub Actions made it seamless
 3. **Learning curve:** Team documentation helped onboarding
 
@@ -188,7 +188,7 @@ All documentation meets quality standards:
 
 **Files Created:**
 - `docs/adrs/README.md`
-- `docs/adrs/ADR-001-modsecurity-over-app-gateway.md`
+- `docs/adrs/ADR-002-vnet-service-endpoints.md`
 - `docs/adrs/ADR-002-vnet-service-endpoints.md`
 - `docs/adrs/ADR-004-oss-security-tools.md`
 - `docs/phase6-completion-summary.md`

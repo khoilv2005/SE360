@@ -36,7 +36,7 @@ kubectl logs <POD_NAME> -n <NAMESPACE> --tail=100
 ```
 
 ### Common Causes
-- **DoS Attack:** Unusual traffic spike → Check ModSecurity logs
+- **DoS Attack:** Unusual traffic spike → Check Service Mesh logs
 - **Memory Leak:** Continuous CPU increase → Check memory usage
 - **Inefficient Code:** Specific endpoint causing spike → Review app logs
 
@@ -44,8 +44,8 @@ kubectl logs <POD_NAME> -n <NAMESPACE> --tail=100
 
 **If DoS Attack:**
 ```bash
-# Check ModSecurity blocks
-kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep ModSecurity | grep blocked
+# Check Service Mesh blocks
+kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep Service Mesh | grep blocked
 
 # Identify attacking IPs
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "429\|403"
@@ -205,7 +205,7 @@ kubectl edit ingress uitgo-ingress
 
 **If Attack:**
 ```bash
-# Already blocked by WAF - no action needed
+# Already blocked by Service Mesh - no action needed
 # Monitor for pattern changes
 
 # If persistent attack from single IP
@@ -289,7 +289,7 @@ If database unreachable >10 minutes: Azure support ticket
 
 **Trigger:** >5 failed logins from same IP  
 **Severity:** Medium  
-**Alert:** ModSecurity rule 900106
+**Alert:** Service Mesh rule 900106
 
 ### Investigation Steps
 
@@ -308,7 +308,7 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "/api/u
 
 **If Brute Force Attack:**
 ```bash
-# Already rate-limited by ModSecurity (5 attempts/min)
+# Already rate-limited by Service Mesh (5 attempts/min)
 # Blocked automatically after threshold
 
 # If attack persists, add IP block

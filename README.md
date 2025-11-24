@@ -1,35 +1,32 @@
-# UIT-Go - Ride Hailing Platform
+# UIT-Go - Nền tảng Gọi Xe
 
 UIT-Go là nền tảng gọi xe được xây dựng với kiến trúc microservices sử dụng FastAPI, Python, và được triển khai trên Azure Kubernetes Service (AKS).
 
 ## 📚 Tài liệu hệ thống
 
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Kiến trúc microservices, sơ đồ luồng nghiệp vụ, giao tiếp giữa các service
-- **[plan.md](docs/plan.md)**: Kế hoạch Module C - Security (DevSecOps), Zero Trust architecture, Service Mesh, CI/CD security
+- **[plan.md](docs/plan.md)**: Kế hoạch triển khai & security architecture
+- **[ADRs](docs/ADRs/)**: Architecture Decision Records - các quyết định kiến trúc
 - **[ENV.sample](docs/ENV.sample)**: Template file môi trường
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Tổng quan kiến trúc hệ thống
+- **[demo.md](docs/demo.md)**: Kế hoạch demo và kịch bản thuyết trình
+- **[threat-model.md](docs/threat-model.md)**: Phân tích rủi ro bảo mật
 
-## 🏗️ Kiến trúc hệ thống
+## 🏗️ Triển khai
 
-### Microservices
+### Tổng quan Services
+- **5 Microservices**: Kiến trúc microservices FastAPI-based
+- **3 Databases**: PostgreSQL, Azure CosmosDB, Redis Cache
+- **AKS Deployment**: Thiết lập production trên Azure Kubernetes Service
 
-- **UserService** (Port 8000): Authentication, JWT issuance, user profiles
-- **TripService** (Port 8002): Trip lifecycle, matching, orchestration
-- **DriverService** (Port 8003): Driver profiles, wallet management
-- **LocationService** (Port 8001): Real-time location tracking, WebSocket, notifications
-- **PaymentService** (Port 8004): User wallet, VNPay integration
+### Công nghệ sử dụng
+- **Backend**: Python, FastAPI, SQLAlchemy
+- **Database**: PostgreSQL, MongoDB (CosmosDB), Redis
+- **Infrastructure**: Azure AKS, Terraform
+- **Security**: Linkerd Service Mesh, Zero Trust, mTLS
 
-### Databases
+**Chi tiết architecture**: Xem [ARCHITECTURE.md](ARCHITECTURE.md)
 
-- **PostgreSQL**: User data (uitgo_users)
-- **Azure CosmosDB** (MongoDB API): Trips, drivers, payments data
-- **Azure Redis Cache**: Geospatial indexing, real-time location cache
-
-### External APIs
-
-- **Mapbox API**: Routing and geocoding
-- **VNPay**: Payment gateway integration
-
-## 🚀 Quick Start
+## 🚀 Bắt đầu nhanh
 
 ### 1. Cài đặt môi trường
 
@@ -48,228 +45,219 @@ cp docs/ENV.sample .env
 # - Database credentials
 ```
 
-### 2. Chạy với Docker Compose (Development)
+### 2. Triển khai trên Azure AKS
 
 ```bash
-# Build và start all services
-docker-compose up -d
+# Triển khai infrastructure
+cd terraform
+terraform init
+terraform apply
 
-# View logs
-docker-compose logs -f [service_name]
+# Triển khai ứng dụng
+cd ..
+kubectl apply -f k8s/
 
-# Stop all services
-docker-compose down
-```
-
-**Service URLs (localhost):**
-- UserService: http://localhost:8000
-- LocationService: http://localhost:8001
-- TripService: http://localhost:8002
-- DriverService: http://localhost:8003
-- PaymentService: http://localhost:8004
-
-### 3. Deploy lên Azure Kubernetes (Production)
-
-Deployment thông qua GitHub Actions CI/CD pipeline (xem `.github/workflows/deploy.yml`):
-
-```bash
-# Pipeline tự động chạy khi push lên main:
-# 1. Test → 2. Build & Push to ACR → 3. Deploy to AKS → 4. Smoke Test
-
-# Manual deployment (nếu cần):
-az acr login --name acruitgoprod
-docker build -t acruitgoprod.azurecr.io/userservice:latest ./UserService
-docker push acruitgoprod.azurecr.io/userservice:latest
-
-# Deploy lên AKS
-kubectl apply -f k8s/userservice.yaml
+# Kiểm tra trạng thái
 kubectl get pods
 ```
 
-## 🔑 API Endpoints (Tóm tắt)
+## 🚀 Triển khai trên Local
 
-**Base URL (Production):** `http://<INGRESS-IP>/api/<service>/`
+### Prerequisites
+- Python 3.9+
+- Docker Desktop
+- PostgreSQL, Redis, MongoDB (nếu không dùng Azure)
 
-### UserService
-- `POST /api/users/auth/register` - Đăng ký user
-- `POST /api/users/auth/login` - Đăng nhập, nhận JWT token
-- `POST /api/users/auth/token` - Lấy service token (internal)
-- `GET /api/users/{id}` - Thông tin user
-
-### TripService
-- `POST /api/trips/fare-estimate` - Ước tính giá cước
-- `POST /api/trips/trip-requests/complete` - Tạo chuyến đi
-- `PUT /api/trips/{id}/assign-driver` - Tài xế nhận chuyến
-- `POST /api/trips/{id}/complete` - Hoàn thành chuyến
-
-### DriverService
-- `POST /api/drivers/` - Đăng ký tài xế
-- `GET /api/drivers/{id}` - Thông tin tài xế
-- `GET /api/drivers/internal/{id}` - Internal endpoint (cần service token)
-
-### LocationService
-- `GET /api/locations/drivers/nearby` - Tìm tài xế gần
-- `POST /api/locations/notify/drivers` - Gửi thông báo đến drivers
-- `WS /ws/driver/{id}/location` - WebSocket cập nhật vị trí
-- `WS /ws/trip/{id}/{user_type}` - WebSocket theo dõi chuyến đi
-
-### PaymentService
-- `POST /api/payments/process-payment` - Xử lý thanh toán
-- `GET /api/payments/payment-return` - VNPay callback
-- `GET /api/payments/users/{id}/wallet` - Thông tin ví
-- `POST /api/payments/wallets/top-up` - Nạp tiền
-
-**Note:** Ingress sẽ rewrite `/api/users/auth/login` → `/auth/login` khi forward đến UserService
-
-## 🔐 Authentication Flow
-
-### User Authentication
-1. User gọi `POST /auth/login` với username/password
-2. UserService trả về JWT token
-3. User sử dụng token trong header: `Authorization: Bearer <token>`
-
-### Service-to-Service Authentication
-1. TripService gọi `POST /auth/token` với client credentials
-2. UserService trả về service JWT (type=service)
-3. TripService dùng service token để gọi DriverService internal endpoints
-
-## 🌐 Deployment Architecture (Azure)
-
-### **Ingress API Gateway Pattern**
-
-```
-Internet (Client Apps)
-   │
-   ▼
-Azure Load Balancer (Public IP)
-   │
-   ▼
-┌──────────────────────────────────────────────────────┐
-│  NGINX Ingress Controller (API Gateway)             │
-│  - Type: LoadBalancer                                │
-│  - Routes based on path:                             │
-│    • /api/users/*     → UserService                  │
-│    • /api/trips/*     → TripService                  │
-│    • /api/drivers/*   → DriverService                │
-│    • /api/locations/* → LocationService              │
-│    • /api/payments/*  → PaymentService               │
-│    • /ws              → LocationService (WebSocket)  │
-│  - Future: + Linkerd Service Mesh                    │
-└──────────────────────────────────────────────────────┘
-   │
-   ▼
-┌─────────────────────────────────────┐
-│  AKS Cluster (VNet: 172.16.0.0/16) │
-│  All services: ClusterIP (internal) │
-│  ├─ UserService:8000                │
-│  ├─ TripService:8000                │
-│  ├─ DriverService:8000              │
-│  ├─ LocationService:8000            │
-│  └─ PaymentService:8000             │
-└─────────────────────────────────────┘
-   │
-   ▼
-┌─────────────────────────────────────┐
-│  Azure Databases (Private VNet)    │
-│  ├─ PostgreSQL (uitgo_users)       │
-│  ├─ CosmosDB (trips/drivers/pay)   │
-│  └─ Redis Cache (location)         │
-└─────────────────────────────────────┘
-```
-
-**Ưu điểm của Ingress Pattern:**
-- ✅ Single entry point cho external traffic
-- ✅ Centralized routing, SSL termination, CORS
-- ✅ Không có bottleneck (không qua UserService)
-- ✅ Dễ mở rộng (thêm service chỉ cần thêm path rule)
-- ✅ Tất cả services đều ClusterIP (bảo mật hơn)
-
-Chi tiết architecture và sequence diagrams xem [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-
-Security planning và Zero Trust architecture xem [docs/plan.md](docs/plan.md)
-
-## 📁 Project Structure
-
-```
-se360-uit-go/
-├── UserService/          # Authentication & user management
-├── TripService/          # Trip lifecycle orchestration
-├── DriverService/        # Driver profiles & wallet
-├── LocationService/      # Real-time location & WebSocket
-├── PaymentService/       # Payment processing & VNPay
-├── docs/
-│   ├── ARCHITECTURE.md   # System architecture
-│   ├── plan.md           # Security planning (Module C - DevSecOps)
-│   └── ENV.sample        # Environment variables template
-├── k8s/                  # Kubernetes manifests
-├── terraform/            # Infrastructure as Code
-├── docker-compose.yml    # Local development setup
-└── README.md            # This file
-```
-
-## 🛠️ Development
-
-### Chạy service riêng lẻ
-
+### 2.1 Chạy với Docker Compose
 ```bash
-cd UserService
+# Xây dựng và khởi động các services
+docker-compose up --build
+
+# Kiểm tra health
+curl http://localhost:8000/userservice/health
+curl http://localhost:8002/tripservice/health
+```
+
+### 2.2 Chạy local (phát triển)
+```bash
+# Cài đặt dependencies
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Khởi động các services (mỗi terminal)
+cd userservice && python main.py
+cd tripservice && python main.py
+cd driverservice && python main.py
+cd locationservice && python main.py
+cd paymentservice && python main.py
 ```
 
-### Database access
+## 📡 API Documentation
 
-**Local development (Docker Compose):**
+### Authentication
+- **POST** `/api/users/login` - Đăng nhập
+- **POST** `/api/users/register` - Đăng ký
+- **POST** `/api/users/refresh` - Làm mới token
+
+### Trips
+- **GET** `/api/trips` - Lấy danh sách chuyến đi
+- **POST** `/api/trips` - Tạo chuyến đi mới
+- **GET** `/api/trips/{trip_id}` - Chi tiết chuyến đi
+- **PUT** `/api/trips/{trip_id}` - Cập nhật trạng thái
+
+### Drivers
+- **GET** `/api/drivers/nearby` - Tìm tài xế gần
+- **PUT** `/api/drivers/{driver_id}/location` - Cập nhật vị trí
+- **GET** `/api/drivers/{driver_id}/wallet` - Xem ví
+
+### Location Tracking
+- **WebSocket** `/ws/location/{trip_id}` - Theo dõi vị trí real-time
+
+### Payments
+- **POST** `/api/payments/create` - Tạo thanh toán
+- **POST** `/api/payments/vnpay` - Thanh toán VNPay
+
+## 🗺️ Kiến trúc hệ thống
+
+### Luồng dữ liệu chính
+```
+┌──────────────┐    HTTPS    ┌──────────────────┐    mTLS    ┌─────────────────┐
+│   Mobile App  │ ────────► │  NGINX Ingress   │ ────────► │ UserService     │
+│  (Passenger   │            │ + Linkerd Mesh   │           │ (Authentication)│
+│   + Driver)   │            └────────┬─────────┘           └─────────┬───────┘
+└──────────────┘                     │                               │
+                                      ▼                               ▼
+                               ┌─────────────────┐              ┌──────────────┐
+                               │  PaymentService │              │ PostgreSQL   │
+                               │  (VNPay API)    │              │   (Users)    │
+                               └────────┬─────────┘              └──────────────┘
+                                        │
+                                        ▼
+                                ┌─────────────────┐
+                                │   TripService   │
+                                │ (Orchestration) │
+                                └────────┬─────────┘
+                                         │
+                               mTLS     ▼
+                    ┌───────────────────────────────────┐
+                    │ CosmosDB (MongoDB) + Redis Cache   │
+                    │    (Trips, Locations, Caching)     │
+                    └───────────────────────────────────┘
+```
+
+### Security Architecture
+- **Layer 1**: Network Security (NSGs, VNet)
+- **Layer 2**: Ingress Security (NGINX + Rate Limiting)
+- **Layer 3**: Service Mesh Security (Linkerd mTLS)
+- **Layer 4**: Application Security (JWT, Input Validation)
+- **Layer 5**: Data Security (Encryption at Rest)
+
+## 🔒 Các tính năng bảo mật
+
+### Zero Trust Architecture
+- **mTLS Encryption**: Mọi traffic giữa services được mã hóa
+- **Network Policies**: Default deny, chỉ cho phép traffic cần thiết
+- **Identity Verification**: Service-to-service authentication
+
+### Mobile App Security
+- **No WAF**: Tối ưu cho mobile app backend
+- **API Rate Limiting**: Bảo vệ DoS attacks
+- **JWT Authentication**: Secure token-based auth
+- **Input Validation**: Ngăn injection attacks
+
+### Database Security
+- **VNet Integration**: Private database access
+- **Encryption at Rest**: K8s secrets + database encryption
+- **Access Control**: Least privilege principle
+
+## 📊 Giám sát & Logging
+
+### Health Checks
+- Liveness/Readiness probes cho tất cả services
+- Health endpoints: `/health`, `/ready`
+- Service mesh health monitoring
+
+### Logs
+- Structured JSON logging
+- Log aggregation với Fluent Bit
+- Application & security event logging
+
+### Metrics
+- Application metrics (Prometheus format)
+- Service mesh telemetry
+- Azure Monitor integration
+
+## 🛠️ Công cụ phát triển
+
+### Local Development
+- **Docker Compose**: Full stack local
+- **Minikube/kind**: Local Kubernetes
+- **SQLite**: Local testing database
+
+### CI/CD
+- **GitHub Actions**: Automated testing & deployment
+- **Terraform**: Infrastructure as Code
+- **Helm**: Kubernetes package management
+
+### Testing
+- **Unit Tests**: pytest
+- **Integration Tests**: API testing
+- **Load Testing**: Performance testing
+
+## 📋 Quy trình phát triển
+
+### 1. Feature Development
 ```bash
-# MongoDB (local container)
-docker exec -it uitgo-mongodb mongosh -u admin -p secret
-
-# PostgreSQL (local container)
-docker exec -it uitgo-postgres psql -U admin -d mydb
-
-# Redis (local container)
-docker exec -it uitgo-redis redis-cli
+git checkout -b feature/new-feature
+# ... development ...
+git commit -m "feat: add new feature"
+git push origin feature/new-feature
+# Create Pull Request
 ```
 
-**Production (Azure):**
+### 2. Code Quality
+- Code review required
+- Automated tests pass
+- Security scans pass
+- Documentation updated
+
+### 3. Deployment
+- Auto-deploy on merge to main
+- Staging environment first
+- Production with manual approval
+
+## 🚨 Troubleshooting
+
+### Common Issues
+- **Service unreachable**: Check network policies
+- **Database connection**: Verify VNet endpoints
+- **mTLS failures**: Check Linkerd certificates
+- **High latency**: Check service mesh metrics
+
+### Debug Commands
 ```bash
-# CosmosDB - Use connection string from Azure Portal
-# PostgreSQL - Connect via Azure PostgreSQL flexible server
-# Redis - Connect via Azure Redis Cache endpoint
+# Service mesh debugging
+kubectl get networkpolicies
+linkerd check
+linkerd tap deploy/userservice
+
+# Application debugging
+kubectl logs deployment/userservice
+kubectl describe pod <pod-name>
 ```
 
-## 🔍 Monitoring & Troubleshooting
+## 📞 Hỗ trợ
 
-```bash
-# View Kubernetes pods status
-kubectl get pods
-
-# View service logs
-kubectl logs -f deployment/userservice
-
-# Port forward for local testing
-kubectl port-forward service/tripservice 8002:8000
-
-# Check service health via Ingress
-kubectl get ingress
-# Lấy EXTERNAL-IP và test: curl http://<EXTERNAL-IP>/health
-```
-
-## 🤝 Contributing
-
-1. Đọc [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) để hiểu kiến trúc
-2. Tạo branch mới từ `main`
-3. Implement feature/fix
-4. Test locally với Docker Compose
-5. Create pull request
+- **Issues**: [GitHub Issues](https://github.com/[your-org]/se360-uit-go/issues)
+- **Documentation**: [Wiki](https://github.com/[your-org]/se360-uit-go/wiki)
+- **Team Development**: [Development Guide](docs/development-guide.md)
 
 ## 📄 License
 
-[License information here]
+© 2024 UIT-Go Team. All rights reserved.
 
-## 📞 Support
+---
 
-- **Issues**: Report tại GitHub Issues
-- **Documentation**: Xem folder `docs/`
-- **Architecture Questions**: Đọc [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Security Planning**: Đọc [plan.md](docs/plan.md)
+**Made with ❤️ by UIT-Go Development Team**
+
+**Version**: 1.0.0
+**Last Updated**: 2024-11-24

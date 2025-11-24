@@ -180,7 +180,7 @@ kubectl run -it --rm test --image=mongo:6 --restart=Never -- \
 Internet
    │
    ▼
-NGINX Ingress (No WAF)
+NGINX Ingress
    │
    ├─── UserService ───► PostgreSQL (Private ✅)
    ├─── TripService ───► CosmosDB (PUBLIC ❌)
@@ -194,7 +194,7 @@ NGINX Ingress (No WAF)
 Internet
    │
    ▼
-NGINX Ingress (No WAF) ← Still need Phase 2
+NGINX Ingress ← Need Phase 2 for rate limiting
    │ (NSG: Allow 80/443 only)
    │
    ├─── UserService ───► PostgreSQL (Private + NSG ✅)
