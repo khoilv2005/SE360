@@ -1,15 +1,15 @@
-# Threat Model của UIT-Go
+# Mô Hình Mối Đe Dọa của UIT-Go
 
-Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phương pháp STRIDE.
+Phân tích mối đe dọa cho hệ thống UIT-Go ride-sharing platform sử dụng phương pháp STRIDE.
 
-## 📊 Data Flow Diagrams (DFD)
+## 📊 Sơ Đồ Luồng Dữ Liệu (DFD)
 
-### DFD Level 0: Context Diagram
+### DFD Level 0: Sơ Đồ Ngữ Cảnh
 
 ```
 ┌──────────────┐
-│   Passenger  │
-│     App      │
+│   Khách hàng │
+│   Ứng dụng   │
 └──────┬───────┘
        │
        │ HTTPS
@@ -23,21 +23,21 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
      │         │          │          │
      │         │          │          │
 ┌────▼────┐ ┌──▼──────┐ ┌▼────────┐ ┌▼──────┐
-│ Driver  │ │  VNPay  │ │ Mapbox  │ │ Azure │
-│   App   │ │ Payment │ │   API   │ │  DBs  │
+│ Tài xế  │ │  VNPay  │ │ Mapbox  │ │ Azure │
+│ Ứng dụng│ │ Thanh to│ │   API   │ │  DBs  │
 └─────────┘ └─────────┘ └─────────┘ └───────┘
 ```
 
-**External Entities:**
-1. **Passenger App** - Mobile/Web client cho hành khách
-2. **Driver App** - Mobile app cho tài xế
-3. **VNPay** - Payment gateway (bên thứ 3)
-4. **Mapbox API** - Geolocation service (bên thứ 3)
+**Các Thực Thể Bên Ngoài:**
+1. **Ứng dụng Khách hàng** - Ứng dụng Mobile/Web cho hành khách
+2. **Ứng dụng Tài xế** - Ứng dụng mobile cho tài xế
+3. **VNPay** - Cổng thanh toán (bên thứ ba)
+4. **Mapbox API** - Dịch vụ định vị (bên thứ ba)
 5. **Azure Databases** - PostgreSQL, CosmosDB, Redis
 
 ---
 
-### DFD Level 1: Service Interactions
+### DFD Level 1: Tương Tác Dịch Vụ
 
 ```
                         Internet (HTTPS)
@@ -78,22 +78,22 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
                             ▼
                      ┌─────────────┐
                      │ VNPay API   │
-                     │  (External) │
+                     │  (Bên ngoài) │
                      └─────────────┘
 ```
 
-**Key Data Flows:**
-1. **Authentication**: Passenger/Driver → UserService → PostgreSQL
-2. **Trip Booking**: Passenger → TripService → CosmosDB
-3. **Location Tracking**: Driver → LocationService → Redis (real-time)
-4. **Payment**: Passenger → PaymentService → VNPay → CosmosDB
-5. **Driver Management**: Admin → DriverService → CosmosDB
+**Luồng Dữ Liệu Chính:**
+1. **Xác thực**: Khách hàng/Tài xế → UserService → PostgreSQL
+2. **Đặt chuyến**: Khách hàng → TripService → CosmosDB
+3. **Theo dõi vị trí**: Tài xế → LocationService → Redis (thời gian thực)
+4. **Thanh toán**: Khách hàng → PaymentService → VNPay → CosmosDB
+5. **Quản lý tài xế**: Admin → DriverService → CosmosDB
 
 ---
 
-### DFD Level 2: Critical Flows
+### DFD Level 2: Luồng Dữ Liệu Quan Trọng
 
-#### Flow 1: User Authentication
+#### Luồng 1: Xác Thực Người Dùng
 
 ```
 ┌─────────┐
@@ -103,14 +103,14 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
      │ {username, password}
      ▼
 ┌──────────────┐
-│   Ingress    │ ← Rate limiting (5 login/min)
+│   Ingress    │ ← Giới hạn tốc độ (5 login/min)
 │ + Linkerd    │ ← Service Mesh + mTLS
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
 │ UserService  │
-│  1. Validate │
+│  1. Xác thực│
 │  2. Hash pwd │
 │  3. Query DB │
 └──────┬───────┘
@@ -136,32 +136,32 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
 └─────────┘
 ```
 
-**Threats:**
-- Brute force attacks
+**Mối đe dọa:**
+- Tấn công brute force
 - Credential stuffing
-- JWT token stealing
+- Đánh cắp JWT token
 - Man-in-the-middle
 
-#### Flow 2: Trip Booking
+#### Luồng 2: Đặt Chuyến
 
 ```
 ┌─────────┐
-│ Passenger│
+│ Khách hàng│
 └────┬────┘
      │ POST /api/trips
      │ {pickup, destination}
      ▼
 ┌──────────────┐
-│   Ingress    │ ← Authentication check
+│   Ingress    │ ← Kiểm tra xác thực
 │ + Linkerd    │ ← Service Mesh + mTLS
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
 │ TripService  │
-│ 1. Validate  │
-│ 2. Find driver│
-│ 3. Save to DB │
+│ 1. Xác thực  │
+│ 2. Tìm tài xế│
+│ 3. Lưu vào DB │
 └──────┬───────┘
        │
        ▼
@@ -174,25 +174,25 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
        ▼
 ┌──────────────┐
 │ TripService  │
-│ Notify Driver│
-│ Update Redis │
+│ Thông báo Tài xế│
+│ Cập nhật Redis │
 └──────┬───────┘
        │
        │ WebSocket + HTTP
        ▼
 ┌────────────────────────────┐
-│        Driver App          │
-│     Notification           │
+│        Ứng dụng Tài xế     │
+│     Thông báo              │
 └────────────────────────────┘
 ```
 
-**Threats:**
-- Unauthorized trip creation
-- Fake driver assignment
-- Trip data tampering
-- Denial of service
+**Mối đe dọa:**
+- Tạo chuyến trái phép
+- Gán tài xế giả
+- Canh cóp dữ liệu chuyến đi
+- Từ chối dịch vụ
 
-#### Flow 3: Payment Processing
+#### Luồng 3: Xử Lý Thanh Toán
 
 ```
 ┌─────────┐
@@ -202,179 +202,179 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
      │ {trip_id, amount}
      ▼
 ┌──────────────┐
-│   Ingress    │ ← Input validation
+│   Ingress    │ ← Kiểm tra đầu vào
 │ + Linkerd    │ ← Service Mesh + mTLS
 └──────┬───────┘
        │
        ▼
 ┌──────────────┐
 │PaymentService│
-│ 1. Validate  │
-│ 2. Call VNPay│
+│ 1. Xác thực  │
+│ 2. Gọi VNPay │
 └──────┬───────┘
        │
        │ HTTPS + API Key
        ▼
 ┌─────────────────────────────┐
-│         VNPay Gateway        │
-│  Payment processing         │
+│         Cổng VNPay          │
+│  Xử lý thanh toán           │
 └─────────────┬───────────────┘
               │
-              │ Payment URL
+              │ URL thanh toán
               ▼
 ┌─────────────────────────────┐
 │         Client              │
-│  Redirect to VNPay         │
+│  Chuyển hướng đến VNPay     │
 └─────────────────────────────┘
 ```
 
-**Threats:**
-- Payment amount tampering
-- Unauthorized refunds
-- Payment API abuse
-- Transaction replay attacks
+**Mối đe dọa:**
+- Can thiệp số tiền thanh toán
+- Hoàn tiền trái phép
+- Lạm dụng API thanh toán
+- Tấn công replay giao dịch
 
 ---
 
-## 🎯 Phân tích STRIDE
+## 🎯 Phân Tích STRIDE
 
-### Component 1: NGINX Ingress Controller + Linkerd Service Mesh
+### Thành phần 1: NGINX Ingress Controller + Linkerd Service Mesh
 
-| Threat | Description | Likelihood | Impact | Mitigation | Priority |
+| Mối đe dọa | Mô tả | Khả năng | Tác động | Giải pháp | Ưu tiên |
 |--------|-------------|------------|--------|------------|----------|
-| **Spoofing** | Attacker impersonates legitimate client | Medium | High | TLS certificates, JWT validation | HIGH |
-| **Tampering** | Modify requests in transit | Low | High | HTTPS/TLS 1.3 + Service Mesh mTLS | MEDIUM |
-| **Repudiation** | Deny sending malicious requests | Medium | Low | Access logs, Service Mesh audit logs | LOW |
-| **Info Disclosure** | Expose internal service IPs | Low | Medium | Network policies block direct access | MEDIUM |
-| **DoS** | Flood with requests | High | High | Rate limiting (NGINX), connection limits | HIGH |
-| **Elevation** | Bypass security controls | Medium | High | Network policies + Zero Trust | HIGH |
+| **Giả mạo** | Kẻ tấn công mạo danh client hợp lệ | Trung bình | Cao | TLS certificates, JWT validation | CAO |
+| **Can thiệp** | Sửa đổi request trong quá trình truyền | Thấp | Cao | HTTPS/TLS 1.3 + Service Mesh mTLS | TRUNG BÌNH |
+| **Chối bỏ** | Chối gửi request độc hại | Trung bình | Thấp | Access logs, Service Mesh audit logs | THẤP |
+| **Tiết lộ thông tin** | Phơi bày IP dịch vụ nội bộ | Thấp | Trung bình | Network policies chặn truy cập trực tiếp | TRUNG BÌNH |
+| **Từ chối dịch vụ** | Flood với requests | Cao | Cao | Rate limiting (NGINX), connection limits | CAO |
+| **Nâng cao quyền** | Bỏ qua kiểm soát bảo mật | Trung bình | Cao | Network policies + Zero Trust | CAO |
 
-**Recommended Mitigations:**
-- ✅ Enable Linkerd Service Mesh với automatic mTLS
-- ✅ Rate limiting: 100 req/min general, 5 login/min
-- ✅ Network policies: Default deny all
-- ✅ Service-to-service encryption by default
-- ✅ Request body size limit: 10MB
+**Giải pháp đề xuất:**
+- ✅ Bật Linkerd Service Mesh với automatic mTLS
+- ✅ Rate limiting: 100 req/min chung, 5 login/min
+- ✅ Network policies: Chặn tất cả theo mặc định
+- ✅ Mã hóa service-to-service theo mặc định
+- ✅ Giới hạn kích thước request body: 10MB
 
 ---
 
-### Component 2: UserService (Authentication)
+### Thành phần 2: UserService (Xác thực)
 
-| Threat | Description | Likelihood | Impact | Mitigation | Priority |
+| Mối đe dọa | Mô tả | Khả năng | Tác động | Giải pháp | Ưu tiên |
 |--------|-------------|------------|--------|------------|----------|
-| **Spoofing** | Fake user credentials | High | High | Strong password hashing, rate limiting | HIGH |
-| **Tampering** | Modify user data | Medium | High | Input validation, database constraints | HIGH |
-| **Repudiation** | Deny transaction | High | Medium | Comprehensive audit logs | MEDIUM |
-| **Info Disclosure** | Leak user PII | Medium | Critical | Data encryption, access controls | CRITICAL |
-| **DoS** | Authentication DoS | High | Medium | Rate limiting, account lockout | MEDIUM |
-| **Elevation** | Privilege escalation | Low | Critical | RBAC, least privilege | CRITICAL |
+| **Giả mạo** | Thông tin đăng nhập giả | Cao | Cao | Mã hóa password mạnh, rate limiting | CAO |
+| **Can thiệp** | Sửa đổi dữ liệu người dùng | Trung bình | Cao | Kiểm tra đầu vào, ràng buộc DB | CAO |
+| **Chối bỏ** | Chối thực hiện giao dịch | Cao | Trung bình | Logs audit toàn diện | TRUNG BÌNH |
+| **Tiết lộ thông tin** | Lọt PII người dùng | Trung bình | NGHIÊM TRỌNG | Mã hóa dữ liệu, kiểm soát truy cập | NGHIÊM TRỌNG |
+| **Từ chối dịch vụ** | Authentication DoS | Cao | Trung bình | Rate limiting, khóa tài khoản | TRUNG BÌNH |
+| **Nâng cao quyền** | Leo thang đặc quyền | Thấp | NGHIÊM TRỌNG | RBAC, đặc quyền tối thiểu | NGHIÊM TRỌNG |
 
-**Recommended Mitigations:**
-- ✅ Argon2 password hashing
-- ✅ JWT với 30-minute expiry
-- ✅ Rate limiting: 5 attempts/min
-- ✅ Account lockout sau 10 failed attempts
-- ✅ PII encryption at rest
+**Giải pháp đề xuất:**
+- ✅ Mã hóa password Argon2
+- ✅ JWT với thời gian hết hạn 30 phút
+- ✅ Rate limiting: 5 lần/phút
+- ✅ Khóa tài khoản sau 10 lần thất bại
+- ✅ Mã hóa PII khi lưu trữ
 
 ---
 
-### Component 3: TripService (Core Business Logic)
+### Thành phần 3: TripService (Logic kinh doanh chính)
 
-| Threat | Description | Likelihood | Impact | Mitigation | Priority |
+| Mối đe dọa | Mô tả | Khả năng | Tác động | Giải pháp | Ưu tiên |
 |--------|-------------|------------|--------|------------|----------|
-| **Spoofing** | Fake trip requests | High | High | Authentication + authorization | HIGH |
-| **Tampering** | Modify trip data | Medium | High | Input validation, business rules | HIGH |
-| **Repudiation** | Deny trip actions | Medium | Medium | Immutable trip logs | MEDIUM |
-| **Info Disclosure** | Leak trip info | Medium | Medium | Access controls, data masking | MEDIUM |
-| **DoS** | Trip creation flood | Medium | Medium | Rate limiting, quotas | MEDIUM |
-| **Elevation** | Admin privilege abuse | Low | High | RBAC, audit trails | HIGH |
+| **Giả mạo** | Request chuyến đi giả | Cao | Cao | Authentication + authorization | CAO |
+| **Can thiệp** | Sửa đổi dữ liệu chuyến đi | Trung bình | Cao | Kiểm tra đầu vào, quy tắc kinh doanh | CAO |
+| **Chối bỏ** | Chối các hành động chuyến đi | Trung bình | Trung bình | Logs chuyến đi bất biến | TRUNG BÌNH |
+| **Tiết lộ thông tin** | Lọt thông tin chuyến đi | Trung bình | Trung bình | Kiểm soát truy cập, ẩn dữ liệu | TRUNG BÌNH |
+| **Từ chối dịch vụ** | Flood tạo chuyến đi | Trung bình | Trung bình | Rate limiting, quotas | TRUNG BÌNH |
+| **Nâng cao quyền** | Lạm dụng quyền admin | Thấp | Cao | RBAC, logs audit | CAO |
 
-**Recommended Mitigations:**
-- ✅ Business rule validation
-- ✅ Geographic boundary checks
-- ✅ Rate limiting per user
-- ✅ Immutable trip records
-- ✅ Driver rating integration
+**Giải pháp đề xuất:**
+- ✅ Kiểm tra quy tắc kinh doanh
+- ✅ Kiểm tra giới hạn địa lý
+- ✅ Rate limiting cho mỗi người dùng
+- ✅ Records chuyến đi bất biến
+- ✅ Tích hợp đánh giá tài xế
 
 ---
 
-### Component 4: PaymentService (Financial)
+### Thành phần 4: PaymentService (Tài chính)
 
-| Threat | Description | Likelihood | Impact | Mitigation | Priority |
+| Mối đe dọa | Mô tả | Khả năng | Tác động | Giải pháp | Ưu tiên |
 |--------|-------------|------------|--------|------------|----------|
-| **Spoofing** | Fake payment requests | High | Critical | Multi-factor auth, digital signatures | CRITICAL |
-| **Tampering** | Modify payment amount | Medium | Critical | Amount validation, digital signatures | CRITICAL |
-| **Repudiation** | Deny payment transaction | High | High | Immutable transaction logs | HIGH |
-| **Info Disclosure** | Leak payment details | Low | Critical | Encrypt card data, PCI-DSS compliance | CRITICAL |
-| **DoS** | Payment API flooding | Medium | High | Rate limiting on payment endpoints | HIGH |
-| **Elevation** | Unauthorized refunds | Low | Critical | Multi-factor auth for refunds, role-based access | CRITICAL |
+| **Giả mạo** | Request thanh toán giả | Cao | NGHIÊM TRỌNG | Multi-factor auth, digital signatures | NGHIÊM TRỌNG |
+| **Can thiệp** | Sửa đổi số tiền thanh toán | Trung bình | NGHIÊM TRỌNG | Kiểm tra số tiền, digital signatures | NGHIÊM TRỌNG |
+| **Chối bỏ** | Chối giao dịch thanh toán | Cao | Cao | Logs giao dịch bất biến | CAO |
+| **Tiết lộ thông tin** | Lọt chi tiết thanh toán | Thấp | NGHIÊM TRỌNG | Mã hóa dữ liệu thẻ, tuân thủ PCI-DSS | NGHIÊM TRỌNG |
+| **Từ chối dịch vụ** | Flood API thanh toán | Trung bình | Cao | Rate limiting trên endpoints thanh toán | CAO |
+| **Nâng cao quyền** | Hoàn tiền trái phép | Thấp | NGHIÊM TRỌNG | Multi-factor auth cho hoàn tiền, role-based access | NGHIÊM TRỌNG |
 
-**Recommended Mitigations:**
-- ✅ HTTPS only đến VNPay
-- ✅ Request/response signature verification
-- ✅ Amount format validation in Service Mesh
-- ✅ Transaction ID uniqueness check
-- ✅ Audit logs cho tất cả payment operations
+**Giải pháp đề xuất:**
+- ✅ Chỉ HTTPS đến VNPay
+- ✅ Kiểm tra signature request/response
+- ✅ Kiểm tra định dạng số tiền trong Service Mesh
+- ✅ Kiểm tra tính duy nhất ID giao dịch
+- ✅ Logs audit cho tất cả operations thanh toán
 
 ---
 
-### Component 5: LocationService (Real-time)
+### Thành phần 5: LocationService (Thời gian thực)
 
-| Threat | Description | Likelihood | Impact | Mitigation | Priority |
+| Mối đe dọa | Mô tả | Khả năng | Tác động | Giải pháp | Ưu tiên |
 |--------|-------------|------------|--------|------------|----------|
-| **Spoofing** | Fake location data | High | High | GPS validation, anti-spoofing | HIGH |
-| **Tampering** | Modify location | Medium | Medium | Location validation, trip correlation | MEDIUM |
-| **Repudiation** | Deny location | Low | Low | Location logging | LOW |
-| **Info Disclosure** | Leak location data | Medium | High | Location encryption, access controls | HIGH |
-| **DoS** | Location update flood | High | Medium | Rate limiting, data throttling | MEDIUM |
-| **Elevation** | Access all locations | Low | High | RBAC, data segregation | HIGH |
+| **Giả mạo** | Dữ liệu vị trí giả | Cao | Cao | Kiểm tra GPS, chống giả mạo | CAO |
+| **Can thiệp** | Sửa đổi vị trí | Trung bình | Trung bình | Kiểm tra vị trí, tương quan chuyến đi | TRUNG BÌNH |
+| **Chối bỏ** | Chối vị trí | Thấp | Thấp | Logs vị trí | THẤP |
+| **Tiết lộ thông tin** | Lọt dữ liệu vị trí | Trung bình | Cao | Mã hóa vị trí, kiểm soát truy cập | CAO |
+| **Từ chối dịch vụ** | Flood cập nhật vị trí | Cao | Trung bình | Rate limiting, giới hạn dữ liệu | TRUNG BÌNH |
+| **Nâng cao quyền** | Truy cập tất cả vị trí | Thấp | Cao | RBAC, phân chia dữ liệu | CAO |
 
-**Recommended Mitigations:**
-- ✅ WebSocket authentication
-- ✅ Location validation bounds
-- ✅ Rate limiting: 10 updates/min
-- ✅ Location data encryption
-- ✅ Privacy controls (driver consent)
+**Giải pháp đề xuất:**
+- ✅ Xác thực WebSocket
+- ✅ Kiểm tra giới hạn vị trí
+- ✅ Rate limiting: 10 cập nhật/phút
+- ✅ Mã hóa dữ liệu vị trí
+- ✅ Controls bảo mật (sự đồng ý của tài xế)
 
 ---
 
-## 🔐 Authentication & Authorization Analysis
+## 🔐 Phân Tích Xác Thực & Phân Quyền
 
-### 1. API Endpoints Authentication
+### 1. Xác Thực API Endpoints
 
-| Endpoint | Protocol | Auth Method | Encryption | Priority |
+| Endpoint | Protocol | Phương thức | Mã hóa | Ưu tiên |
 |----------|----------|-------------|------------|----------|
-| `/api/users/*` | HTTPS | JWT | None | HIGH |
-| `/api/trips/*` | HTTPS | JWT | None | HIGH |
-| `/api/drivers/*` | HTTPS | JWT | None | HIGH |
-| `/api/locations/*` | HTTPS | JWT | None | MEDIUM |
-| `/api/payments/*` | HTTPS | JWT | None | CRITICAL |
-| `/ws` | WSS | JWT | None | HIGH |
+| `/api/users/*` | HTTPS | JWT | Không có | CAO |
+| `/api/trips/*` | HTTPS | JWT | Không có | CAO |
+| `/api/drivers/*` | HTTPS | JWT | Không có | CAO |
+| `/api/locations/*` | HTTPS | JWT | Không có | TRUNG BÌNH |
+| `/api/payments/*` | HTTPS | JWT | Không có | NGHIÊM TRỌNG |
+| `/ws` | WSS | JWT | Không có | CAO |
 
-**After Phase 2 (Service Mesh):**
-- Risk Level giảm xuống MEDIUM/LOW
-- Service Mesh encryption between services
+**Sau Phase 2 (Service Mesh):**
+- Mức độ rủi ro giảm xuống TRUNG BÌNH/THẤP
+- Service mesh mã hóa giữa các services
 
-### 2. Service-to-Service Communication
+### 2. Giao Tiếp Service-to-Service
 
-| Source | Destination | Protocol | Authentication | Encryption |
+| Nguồn | Đích | Protocol | Xác thực | Mã hóa |
 |--------|-------------|----------|----------------|------------|
 | TripService | UserService | HTTP | Linkerd mTLS | mTLS encrypted |
 | PaymentService | TripService | HTTP | Linkerd mTLS | mTLS encrypted |
 | LocationService | TripService | HTTP | Linkerd mTLS | mTLS encrypted |
 
-**Threats:**
-- Service impersonation (MITIGATED ✅)
-- Unauthorized cross-service calls (MITIGATED ✅)
+**Mối đe dọa:**
+- Giả mạo service (ĐÃ GIẢI QUYẾT ✅)
+- Các cuộc gọi dịch vụ trái phép (ĐÃ GIẢI QUYẾT ✅)
 
-**Mitigation (IMPLEMENTED):**
+**Giải pháp (ĐÃ TRIỂN KHAI):**
 - ✅ Linkerd Service Mesh cho mTLS
 - ✅ Zero Trust Network Policies
-- ✅ Automatic certificate rotation
+- ✅ Tự động chuyển đổi chứng chỉ
 
-### 3. Database Access
+### 3. Truy Cập Database
 
-| Database | Access Method | Authentication | Encryption |
+| Database | Phương thức | Xác thực | Mã hóa |
 |----------|----------------|----------------|------------|
 | PostgreSQL | VNet | Azure AD + Connection String | TLS 1.3 |
 | CosmosDB | Service Endpoint | Azure AD | mTLS |
@@ -382,123 +382,123 @@ Threat modeling cho hệ thống UIT-Go ride-sharing platform sử dụng phươ
 
 ---
 
-## 📊 Risk Assessment Matrix
+## 📊 Ma Trận Đánh Giá Rủi Ro
 
-### Risk Levels
-- 🔴 **CRITICAL**: Immediate action required
-- 🟠 **HIGH**: Address within 1 week
-- 🟡 **MEDIUM**: Address within 1 month
-- 🟢 **LOW**: Address in next planning cycle
+### Các Mức Độ Rủi Ro
+- 🔴 **NGHIÊM TRỌNG**: Cần hành động ngay
+- 🟠 **CAO**: Giải quyết trong 1 tuần
+- 🟡 **TRUNG BÌNH**: Giải quyết trong 1 tháng
+- 🟢 **THẤP**: Giải quyết trong chu kỳ lập kế hoạch tiếp theo
 
-### Identified Risks
+### Rủi Ro Đã Xác Định
 
-| Risk | Component | Mitigation Phase | Status |
+| Rủi ro | Thành phần | Giai đoạn Giải pháp | Trạng thái |
 |------|-----------|------------------|--------|
-| CosmosDB publicly accessible | Databases | Phase 1.2 | 🔴 High Priority |
-| Redis publicly accessible | Databases | Phase 1.2 | 🔴 High Priority |
-| No Service Mesh protection | Ingress | Phase 2 | ✅ RESOLVED (Linkerd deployed) |
-| Payment API vulnerable to tampering | PaymentService | Phase 2 | 🔴 High Priority |
-| Weak password hashing | UserService | Phase 3 | 🟡 Medium Priority |
-| No API rate limiting | Ingress | Phase 2 | 🟡 Medium Priority |
-| Insufficient logging | All services | Phase 5 | 🟡 Medium Priority |
+| CosmosDB có thể truy cập công khai | Databases | Phase 1.2 | 🔴 Ưu tiên Cao |
+| Redis có thể truy cập công khai | Databases | Phase 1.2 | 🔴 Ưu tiên Cao |
+| Không có Service Mesh protection | Ingress | Phase 2 | ✅ ĐÃ GIẢI QUYẾT (Linkerd đã triển khai) |
+| Payment API dễ bị can thiệp | PaymentService | Phase 2 | 🔴 Ưu tiên Cao |
+| Mã hóa password yếu | UserService | Phase 3 | 🟡 Ưu tiên Trung bình |
+| Không có API rate limiting | Ingress | Phase 2 | 🟡 Ưu tiên Trung bình |
+| Logging không đủ | All services | Phase 5 | 🟡 Ưu tiên Trung bình |
 
-### High Risks
+### Rủi Ro Cao
 
-1. **Database Public Exposure** (CRITICAL)
-   - CosmosDB & Redis accessible từ internet
-   - **Mitigation**: VNet Service Endpoints + NSGs
+1. **Phơi Bày Database Công Khai** (NGHIÊM TRỌNG)
+   - CosmosDB & Redis có thể truy cập từ internet
+   - **Giải pháp**: VNet Service Endpoints + NSGs
 
-2. **Payment API Tampering** (HIGH)
-   - No validation on payment amounts
-   - **Mitigation**: Service mesh + input validation
+2. **Can Thiệp API Thanh Toán** (CAO)
+   - Không có kiểm tra số tiền thanh toán
+   - **Giải pháp**: Service mesh + kiểm tra đầu vào
 
-3. **Insufficient Authentication** (HIGH)
-   - No rate limiting on auth endpoints
-   - **Mitigation**: NGINX rate limiting + account lockout
+3. **Xác Thất Không Đủ** (CAO)
+   - Không có rate limiting trên endpoints xác thực
+   - **Giải pháp**: NGINX rate limiting + khóa tài khoản
 
 ---
 
-## 🛡️ Mitigation Strategy
+## 🛡️ Chiến Lược Giải Quyết
 
-### Phase 1: Network & Data Security (Week 1-2)
-- ✅ Database private endpoints (VNet Service Endpoints)
+### Phase 1: Bảo Mạng & Dữ Liệu (Tuần 1-2)
+- ✅ Private endpoints database (VNet Service Endpoints)
 - ✅ Network Security Groups (NSGs)
-- ✅ Secrets encryption at rest
+- ✅ Mã hóa secrets tại rest
 
-### Phase 2: Zero Trust (Week 3)
-- ✅ Service mesh implementation (Linkerd)
-- ✅ mTLS encryption between services
-- ✅ Network policies (default deny)
+### Phase 2: Zero Trust (Tuần 3)
+- ✅ Triển khai service mesh (Linkerd)
+- ✅ Mã hóa mTLS giữa services
+- ✅ Network policies (chặn theo mặc định)
 
-### Phase 3: Application Security (Week 4-5)
-- ✅ Input validation & sanitization
+### Phase 3: Bảo Mật Ứng Dụng (Tuần 4-5)
+- ✅ Kiểm tra & làm sạch đầu vào
 - ✅ Rate limiting & throttling
-- ✅ Authentication hardening
-- ✅ Error handling improvements
+- ✅ Cứng rắc hóa xác thực
+- ✅ Cải thiện xử lý lỗi
 
-### Phase 4: Monitoring & Response (Week 6)
-- ✅ Security monitoring & alerting
-- ✅ Log aggregation & analysis
-- ✅ Incident response procedures
-- ✅ Compliance reporting
-
----
-
-## 📋 Compliance Requirements
-
-### Data Protection
-- **PII Encryption**: User data encrypted at rest and in transit
-- **Location Privacy**: Driver location tracking với consent
-- **Payment Security**: PCI-DSS compliance for payment processing
-
-### Security Standards
-- **OWASP Top 10**: Mitigation cho tất cả 10 categories
-- **Zero Trust**: Never trust, always verify
-- **Defense in Depth**: Multiple security layers
-
-### Auditing & Monitoring
-- **Comprehensive Logging**: All security events logged
-- **Real-time Monitoring**: Threat detection and response
-- **Regular Assessments**: Quarterly security reviews
+### Phase 4: Giám Sát & Phản Hồi (Tuần 6)
+- ✅ Giám sát bảo mật & cảnh báo
+- ✅ Tổng hợp & phân tích logs
+- ✅ Quy trình phản hồi sự cố
+- ✅ Báo cáo tuân thủ
 
 ---
 
-## 🎯 Success Criteria
+## 📋 Yêu Cầu Tuân Thủ
 
-### Security Metrics
-- ✅ **100%** inter-service traffic encrypted with mTLS
-- ✅ **Zero** public database endpoints
-- ✅ **< 5 minutes** average incident response time
-- ✅ **Zero** critical vulnerabilities in production
+### Bảo Mật Dữ Liệu
+- **Mã hóa PII**: Dữ liệu người dùng được mã hóa khi lưu trữ và truyền tải
+- **Quyền Riêng Tư Vị Trí**: Theo dõi vị trí tài xế với sự đồng ý
+- **Bảo Mật Thanh Toán**: Tuân thủ PCI-DSS cho xử lý thanh toán
 
-### Business Impact
-- ✅ **Risk Reduction**: 95% reduction in attack surface
-- ✅ **Compliance**: Ready cho security audits
-- ✅ **Performance**: < 10ms latency overhead
-- ✅ **Cost**: Zero additional security infrastructure cost
+### Tiêu Chuẩn Bảo Mật
+- **OWASP Top 10**: Giải pháp cho tất cả 10 categories
+- **Zero Trust**: Không bao giờ tin, luôn xác thực
+- **Phòng Thủ Đa Lớp**: Multiple security layers
 
----
-
-## 🔄 Maintenance & Updates
-
-### Monthly Tasks
-- Review security logs and alerts
-- Update security patches and CVE fixes
-- Rotate secrets and certificates
-- Test incident response procedures
-
-### Quarterly Tasks
-- Comprehensive security assessment
-- Threat model review and updates
-- Penetration testing
-- Compliance audit preparation
+### Kiểm Toán & Giám Sát
+- **Logging Toàn Diện**: Tất cả sự kiện bảo mật được ghi lại
+- **Giám Sát Thời Gian Thực**: Phát hiện và phản hồi mối đe dọa
+- **Đánh Giá Định Kỳ**: Đánh giá bảo mật hàng quý
 
 ---
 
-**Last Updated:** 2024-11-24
-**Review Date:** 2025-02-24
-**Owner:** UIT-Go Security Team
+## 🎯 Tiêu Chí Thành Công
+
+### Metrics Bảo Mật
+- ✅ **100%** traffic inter-service được mã hóa với mTLS
+- ✅ **Zero** database endpoints công khai
+- ✅ **< 5 phút** thời gian phản hồi sự cố trung bình
+- ✅ **Zero** lỗ hổng nghiêm trọng trong production
+
+### Tác Động Kinh Doanh
+- ✅ **Giảm Rủi Ro**: 95% giảm bề mặt tấn công
+- ✅ **Tuân Thủ**: Sẵn sàng cho đánh giá bảo mật
+- ✅ **Hiệu Suất**: < 10ms độ trễ thêm
+- ✅ **Chi Phí**: Zero chi phí bảo mật thêm
 
 ---
 
-*"Security is not a product, but a process."*
+## 🔄 Bảo Trì & Cập Nhật
+
+### Tác Vụ Hàng Tháng
+- Review logs bảo mật và cảnh báo
+- Cập nhật patches bảo mật và sửa lỗi CVE
+- Xoay vòng secrets và chứng chỉ
+- Kiểm tra quy trình phản hồi sự cố
+
+### Tác Vụ Hàng Quý
+- Đánh giá bảo mật toàn diện
+- Review và cập nhật mô hình mối đe dọa
+- Kiểm thử xâm phạm
+- Chuẩn bị đánh giá tuân thủ
+
+---
+
+**Cập nhật lần cuối:** 2024-11-24
+**Ngày review:** 2025-02-24
+**Người chịu trách nhiệm:** UIT-Go Security Team
+
+---
+
+*"Bảo mật không phải là sản phẩm, mà là một quy trình."*

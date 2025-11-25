@@ -1,177 +1,177 @@
-# Security Runbooks - UIT-Go
+# Runbooks Bảo Mật - UIT-Go
 
-Incident response procedures for common security events.
+Quy trình phản hồi sự cố cho các sự kiện bảo mật phổ biến.
 
-## 📋 Runbook Index
+## 📋 Mục Lục Runbook
 
-1. [High CPU Alert](#runbook-1-high-cpu-alert)
-2. [Pod Restart Loop](#runbook-2-pod-restart-loop)
-3. [Service Mesh mTLS Failure Spike](#runbook-3-service-mesh-mtls-failure-spike)
-4. [Database Connection Failures](#runbook-4-database-connection-failures)
-5. [Suspicious Login Activity](#runbook-5-suspicious-login-activity)
-6. [Container Image Vulnerability](#runbook-6-container-image-vulnerability)
+1. [Cảnh báo CPU cao](#runbook-1-cảnh-báo-cpu-cao)
+2. [Pod khởi động lại lặp lại](#runbook-2-pod-khởi-động-lại-lặp-lại)
+3. [Spike thất bại mTLS Service Mesh](#runbook-3-spike-thất-bại-mtls-service-mesh)
+4. [Thất bại kết nối Database](#runbook-4-thất-bại-kết-nối-database)
+5. [Hoạt động đăng nhập đáng ngờ](#runbook-5-hoạt-động-đăng-nhập-đáng-ngờ)
+6. [Lỗ hổng container image](#runbook-6-lỗ-hổng-container-image)
 
 ---
 
-## Runbook 1: High CPU Alert
+## Runbook 1: Cảnh Báo CPU Cao
 
-**Trigger:** AKS CPU usage > 80%  
-**Severity:** High  
-**Alert:** `aks-high-cpu-alert`
+**Kích hoạt:** CPU AKS > 80%
+**Mức độ nghiêm trọng:** Cao
+**Cảnh báo:** `aks-high-cpu-alert`
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Check which pods are consuming CPU
+# 1. Kiểm tra pod nào đang sử dụng CPU nhiều nhất
 kubectl top pods --all-namespaces --sort-by=cpu
 
-# 2. Check node CPU usage
+# 2. Kiểm tra mức sử dụng CPU node
 kubectl top nodes
 
-# 3. Describe high-CPU pod
+# 3. Mô tả pod CPU cao
 kubectl describe pod <POD_NAME> -n <NAMESPACE>
 
-# 4. Check pod logs
+# 4. Kiểm tra logs pod
 kubectl logs <POD_NAME> -n <NAMESPACE> --tail=100
 ```
 
-### Common Causes
-- **DoS Attack:** Unusual traffic spike → Check Service Mesh logs
-- **Memory Leak:** Continuous CPU increase → Check memory usage
-- **Inefficient Code:** Specific endpoint causing spike → Review app logs
+### Nguyên nhân phổ biến
+- **Tấn công DoS:** Spike traffic bất thường → Kiểm tra logs Service Mesh
+- **Rò rỉ bộ nhớ:** Tăng CPU liên tục → Kiểm tra mức sử dụng bộ nhớ
+- **Code không hiệu quả:** Endpoint cụ thể gây spike → Review logs ứng dụng
 
-### Remediation
+### Khắc phục
 
-**If DoS Attack:**
+**Nếu tấn công DoS:**
 ```bash
-# Check Service Mesh blocks
+# Kiểm tra block Service Mesh
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep Service Mesh | grep blocked
 
-# Identify attacking IPs
+# Xác định IP tấn công
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "429\|403"
 
-# Add IP block rule if needed (emergency)
-kubectl edit cm  -n ingress-nginx
-# Add: SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:900999,phase:1,deny,status:403"
+# Thêm quy tắc block IP (khẩn cấp)
+kubectl edit cm -n ingress-nginx
+# Thêm: SecRule REMOTE_ADDR "@ipMatch 1.2.3.4" "id:900999,phase:1,deny,status:403"
 ```
 
-**If Application Issue:**
+**Nếu sự cố ứng dụng:**
 ```bash
-# Scale up replicas temporarily
+# Tạm thời tăng số lượng replica
 kubectl scale deployment/<SERVICE> --replicas=3
 
-# Restart problematic pod
+# Khởi động lại pod có vấn đề
 kubectl rollout restart deployment/<SERVICE>
 
-# Rollback if recent deployment
+# Hoàn về phiên bản trước nếu triển khai gần đây
 kubectl rollout undo deployment/<SERVICE>
 ```
 
-### Escalation
-If CPU remains >80% for >15 minutes: Contact infrastructure team
+### Mức độ ưu tiên
+Nếu CPU >80% >15 phút: Liên hệ team cơ sở hạ tầng
 
 ---
 
-## Runbook 2: Pod Restart Loop
+## Runbook 2: Pod Khởi Động Lại Lặp Lại
 
-**Trigger:** Pod status < 80% ready  
-**Severity:** Critical  
-**Alert:** `aks-pod-restart-alert`
+**Kích hoạt:** Trạng thái pod < 80% sẵn sàng
+**Mức độ nghiêm trọng:** Nghiêm trọng
+**Cảnh báo:** `aks-pod-restart-alert`
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Identify failing pods
+# 1. Xác định pod đang thất bại
 kubectl get pods --all-namespaces | grep -v Running
 
-# 2. Check restart count
+# 2. Kiểm tra số lần khởi động lại
 kubectl get pods -o json | jq '.items[] | select(.status.containerStatuses[].restartCount > 3) | .metadata.name'
 
-# 3. Get pod events
+# 3. Lấy sự kiện pod
 kubectl describe pod <POD_NAME>
 
-# 4. Check logs (including previous container)
+# 4. Kiểm tra logs (bao gồm container trước đó)
 kubectl logs <POD_NAME> --previous
 ```
 
-### Common Causes
-- **OOM Kill:** Memory limit too low
-- **Liveness Probe Failure:** Health check failing
-- **Security Context Issue:** Non-root user can't access resources
-- **Database Connection:** Can't connect to DB
+### Nguyên nhân phổ biến
+- **OOM Kill:** Giới hạn bộ nhớ quá thấp
+- **Thất bại Liveness Probe:** Kiểm tra sức khỏe thất bại
+- **Vấn đề Security Context:** Người dùng không root không thể truy cập tài nguyên
+- **Kết nối Database:** Không thể kết nối DB
 
-### Remediation
+### Khắc phục
 
-**For OOM:**
+**Đối với OOM:**
 ```bash
-# Increase memory limit
+# Tăng giới hạn bộ nhớ
 kubectl edit deployment/<SERVICE>
-# Change:
+# Thay đổi:
 #   limits:
-#     memory: "1Gi"  # from 512Mi
+#     memory: "1Gi"  # từ 512Mi
 
 kubectl rollout restart deployment/<SERVICE>
 ```
 
-**For Security Context:**
+**Đối với Security Context:**
 ```bash
-# Check filesystem permissions
+# Kiểm tra quyền hệ thống file
 kubectl exec <POD_NAME> -- ls -la /
 
-# Fix ownership if needed (in Dockerfile next build)
-# For now, add writable volume
+# Sửa quyền sở hữu nếu cần (trong Dockerfile build tiếp theo)
+# Hiện tại, thêm volume ghi được
 kubectl edit deployment/<SERVICE>
-# Add volumeMount for required path
+# Thêm volumeMount cho path cần thiết
 ```
 
-**For Database Connection:**
+**Đối với kết nối Database:**
 ```bash
-# Test database connectivity
+# Kiểm tra kết nối database
 kubectl run -it --rm debug --image=busybox --restart=Never -- sh
-# Inside: nc -zv <DB_HOST> <DB_PORT>
+# Bên trong: nc -zv <DB_HOST> <DB_PORT>
 
-# Check secrets
+# Kiểm tra secrets
 kubectl get secret uitgo-secrets -o yaml
 
-# Verify Service Endpoints
+# Xác minh Service Endpoints
 az network vnet subnet show --resource-group rg-uitgo-prod --vnet-name vnet-uitgo-prod --name snet-aks-prod --query "serviceEndpoints"
 ```
 
-### Escalation
-If >5 pods in CrashLoopBackOff: Priority 1 incident
+### Mức độ ưu tiên
+Nếu >5 pods trong CrashLoopBackOff: Sự cố ưu tiên 1
 
 ---
 
-## Runbook 3: Service Mesh mTLS Failure Spike
+## Runbook 3: Spike Thất Bại mTLS Service Mesh
 
-**Trigger:** >10 mTLS connection failures in 5 minutes
-**Severity:** High
-**Alert:** `security-events-alert`
+**Kích hoạt:** >10 thất bại kết nối mTLS trong 5 phút
+**Mức độ nghiêm trọng:** Cao
+**Cảnh báo:** `security-events-alert`
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Check Linkerd control plane status
+# 1. Kiểm tra trạng thái control plane Linkerd
 linkerd check
 
-# 2. View recent connection failures
+# 2. Xem các thất bại kết nối gần đây
 kubectl logs -n linkerd deployment/linkerd-controller | grep -i error | tail -50
 
-# 3. Check data plane proxy status
+# 3. Kiểm tra trạng thái proxy data plane
 kubectl get pods -n linkerd
 
-# 4. View service mesh edges
+# 4. Xem edges service mesh
 linkerd edges deploy --all-namespaces
 
-# 5. Check certificate status
+# 5. Kiểm tra trạng thái chứng chỉ
 kubectl get certificates -n linkerd
 
-# 6. Check specific service connectivity
+# 6. Kiểm tra kết nối service cụ thể
 kubectl port-forward -n linkerd service/linkerd-controller 8080:8080 &
 curl http://localhost:8080/metrics | grep failure
 ```
 
-### Attack Types
+### Các loại tấn công
 
 **SQL Injection:**
 ```bash
@@ -191,227 +191,227 @@ kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "id:941
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "id:900115"
 ```
 
-### Remediation
+### Khắc phục
 
-**If Legitimate Traffic (False Positive):**
+**Nếu traffic hợp lệ (Sai dương):**
 ```bash
-# Identify rule causing block
-# Add exception in ingress.yaml
+# Xác định quy tắc gây block
+# Thêm exception trong ingress.yaml
 kubectl edit ingress uitgo-ingress
-# Add annotation:
+# Thêm annotation:
 #   nginx.ingress.kubernetes.io/ |
 #     SecRuleRemoveById 942100
 ```
 
-**If Attack:**
+**Nếu tấn công:**
 ```bash
-# Already blocked by Service Mesh - no action needed
-# Monitor for pattern changes
+# Đã được Service Mesh chặn - không cần hành động
+# Theo dõi thay đổi pattern
 
-# If persistent attack from single IP
-# Add permanent block
-kubectl edit cm  -n ingress-nginx
-# Add: SecRule REMOTE_ADDR "@ipMatch <ATTACKER_IP>" "id:900998,phase:1,deny,status:403"
+# Nếu tấn công liên tục từ IP đơn lẻ
+# Thêm block vĩnh viễn
+kubectl edit cm -n ingress-nginx
+# Thêm: SecRule REMOTE_ADDR "@ipMatch <ATTACKER_IP>" "id:900998,phase:1,deny,status:403"
 kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
 ```
 
-### Escalation
-If attack continues for >30 minutes: Document and report
+### Mức độ ưu tiên
+Nếu tấn công tiếp tục >30 phút: Ghi lại và báo cáo
 
 ---
 
-## Runbook 4: Database Connection Failures
+## Runbook 4: Thất Bại Kết Nối Database
 
-**Trigger:** Application logs show DB errors  
-**Severity:** Critical
+**Kích hoạt:** Logs ứng dụng hiển thị lỗi DB
+**Mức độ nghiêm trọng:** Nghiêm trọng
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Test PostgreSQL connectivity
+# 1. Kiểm tra kết nối PostgreSQL
 kubectl run -it --rm psql-test --image=postgres:15 --restart=Never -- psql -h <POSTGRES_HOST> -U <USER> -d mydb
 
-# 2. Test CosmosDB connectivity
+# 2. Kiểm tra kết nối CosmosDB
 kubectl run -it --rm mongo-test --image=mongo:6 --restart=Never -- mongosh "<CONNECTION_STRING>"
 
-# 3. Test Redis connectivity
+# 3. Kiểm tra kết nối Redis
 kubectl run -it --rm redis-test --image=redis:7 --restart=Never -- redis-cli -h <REDIS_HOST> ping
 
-# 4. Check Service Endpoints
+# 4. Kiểm tra Service Endpoints
 az network vnet subnet show --resource-group rg-uitgo-prod --vnet-name vnet-uitgo-prod --name snet-aks-prod --query "serviceEndpoints[].service"
 ```
 
-### Common Causes
-- **NSG Rules:** Blocking database traffic
-- **Service Endpoint Issue:** Not configured properly
-- **Secret Rotation:** Old connection string
-- **Database Down:** Azure issue
+### Nguyên nhân phổ biến
+- **Quy tắc NSG:** Chặn traffic database
+- **Vấn đề Service Endpoint:** Không được cấu hình đúng
+- **Xoay vòng Secret:** Chuỗi kết nối cũ
+- **Database hỏng:** Vấn đề Azure
 
-### Remediation
+### Khắc phục
 
-**Check NSG:**
+**Kiểm tra NSG:**
 ```bash
 az network nsg rule list --resource-group rg-uitgo-prod --nsg-name nsg-aks-prod --output table
 
-# Verify database outbound allowed
-# Should see: AllowDatabaseOutbound
+# Xác minh outbound database được cho phép
+# Nên thấy: AllowDatabaseOutbound
 ```
 
-**Check Secrets:**
+**Kiểm tra Secrets:**
 ```bash
-# Get current secret
+# Lấy secret hiện tại
 kubectl get secret uitgo-secrets -o jsonpath='{.data.COSMOS_CONNECTION_STRING}' | base64 -d
 
-# Compare with Azure
+# So sánh với Azure
 az cosmosdb keys list --name cosmos-uitgo-prod --resource-group rg-uitgo-prod --type connection-strings
 ```
 
-**Regenerate Connection String:**
+**Tạo lại Chuỗi Kết Nối:**
 ```bash
-# Get new connection string
+# Lấy chuỗi kết nối mới
 COSMOS_CS=$(az cosmosdb keys list --name cosmos-uitgo-prod --resource-group rg-uitgo-prod --type connection-strings --query "connectionStrings[0].connectionString" -o tsv)
 
-# Update secret
+# Cập nhật secret
 kubectl create secret generic uitgo-secrets --from-literal=COSMOS_CONNECTION_STRING="$COSMOS_CS" --dry-run=client -o yaml | kubectl apply -f -
 
-# Restart affected services
+# Khởi động lại các dịch vụ bị ảnh hưởng
 kubectl rollout restart deployment/tripservice
 kubectl rollout restart deployment/driverservice
 kubectl rollout restart deployment/paymentservice
 ```
 
-### Escalation
-If database unreachable >10 minutes: Azure support ticket
+### Mức độ ưu tiên
+Nếu database không thể kết nối >10 phút: Vé hỗ trợ Azure
 
 ---
 
-## Runbook 5: Suspicious Login Activity
+## Runbook 5: Hoạt Động Đăng Nhập Đáng Ngờ
 
-**Trigger:** >5 failed logins from same IP  
-**Severity:** Medium  
-**Alert:** Service Mesh rule 900106
+**Kích hoạt:** >5 lần đăng nhập thất bại từ cùng IP
+**Mức độ nghiêm trọng:** Trung bình
+**Cảnh báo:** Quy tắc Service Mesh 900106
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Check failed login attempts
+# 1. Kiểm tra các lần đăng nhập thất bại
 kubectl logs deployment/userservice | grep "401\|failed\|unauthorized"
 
-# 2. Identify IP addresses
+# 2. Xác định địa chỉ IP
 kubectl logs -n ingress-nginx deployment/ingress-nginx-controller | grep "/api/users/login" | grep "429\|403"
 
-# 3. Check if IP is known attacker
-# Use threat intelligence database or check https://www.abuseipdb.com
+# 3. Kiểm tra IP có phải là kẻ tấn công đã biết không
+# Sử dụng cơ sở dữ liệu threat intelligence hoặc kiểm tra https://www.abuseipdb.com
 ```
 
-### Remediation
+### Khắc phục
 
-**If Brute Force Attack:**
+**Nếu tấn công brute force:**
 ```bash
-# Already rate-limited by Service Mesh (5 attempts/min)
-# Blocked automatically after threshold
+# Đã được giới hạn tốc độ bởi Service Mesh (5 lần/phút)
+# Tự động bị chặn sau khi vượt ngưỡng
 
-# If attack persists, add IP block
-kubectl edit cm  -n ingress-nginx
-# Add to custom rules
+# Nếu tấn công tiếp tục, thêm block IP
+kubectl edit cm -n ingress-nginx
+# Thêm vào quy tắc tùy chỉnh
 kubectl rollout restart deployment/ingress-nginx-controller -n ingress-nginx
 ```
 
-**If Credential Stuffing:**
+**Nếu Credential Stuffing:**
 ```bash
-# Review user accounts for compromised passwords
+# Review các tài khoản người dùng cho password bị xâm phạm
 kubectl exec deployment/userservice -- python -c "
 from app import check_compromised_passwords
 check_compromised_passwords()
 "
 
-# Force password reset for affected users
+# Yêu cầu đặt lại password cho người dùng bị ảnh hưởng
 ```
 
-### Escalation
-If >100 failed logins/hour: Security team review
+### Mức độ ưu tiên
+Nếu >100 lần đăng nhập thất bại/giờ: Review team bảo mật
 
 ---
 
-## Runbook 6: Container Image Vulnerability
+## Runbook 6: Lỗ Hổng Container Image
 
-**Trigger:** Trivy scan finds HIGH/CRITICAL CVE  
-**Severity:** High (varies by CVE)  
-**Alert:** GitHub Actions workflow failure
+**Kích hoạt:** Quét Trivy phát hiện CVE CAO/NGHIÊM TRỌNG
+**Mức độ nghiêm trọng:** Cao (thay đổi theo CVE)
+**Cảnh báo:** Workflow GitHub Actions thất bại
 
-### Investigation Steps
+### Các bước điều tra
 
 ```bash
-# 1. Download Trivy report from GitHub Artifacts
+# 1. Tải báo cáo Trivy từ GitHub Artifacts
 gh run download <RUN_ID>
 cat trivy-userservice.json | jq '.Results[].Vulnerabilities[] | select(.Severity=="CRITICAL")'
 
-# 2. Check if exploit available
-# Review CVE details at https://cve.mitre.org
+# 2. Kiểm tra nếu có exploit có sẵn
+# Review chi tiết CVE tại https://cve.mitre.org
 
-# 3. Check if fix available
+# 3. Kiểm tra nếu có bản sửa lỗi
 cat trivy-userservice.json | jq '.Results[].Vulnerabilities[] | select(.FixedVersion != "")'
 ```
 
-### Remediation
+### Khắc phục
 
-**If Fix Available:**
+**Nếu có bản sửa lỗi:**
 ```bash
-# Update dependency in requirements.txt
-# For userservice example:
-echo "flask==2.3.5" >> UserService/requirements.txt  # Fixed version
+# Cập nhật dependency trong requirements.txt
+# Ví dụ cho userservice:
+echo "flask==2.3.5" >> UserService/requirements.txt  # Phiên bản đã sửa
 
-# Commit and push
+# Commit và push
 git add UserService/requirements.txt
 git commit -m "fix: Update Flask to patch CVE-XXXX-YYYY"
 git push origin main
 
-# Pipeline will rebuild and rescan
+# Pipeline sẽ build lại và quét lại
 ```
 
-**If No Fix Available:**
+**Nếu không có bản sửa lỗi:**
 ```bash
-# 1. Assess risk
-# - Is service exposed?
-# - Is vulnerable code path used?
-# - What's the CVSS score?
+# 1. Đánh giá rủi ro
+# - Service có được phơi bày không?
+# - Code path dễ bị tổn thương có được sử dụng không?
+# - Điểm CVSS là bao nhiêu?
 
-# 2. If low risk, accept temporarily
-# Add to Trivy ignore list
+# 2. Nếu rủi ro thấp, chấp nhận tạm thời
+# Thêm vào danh sách bỏ qua Trivy
 echo "CVE-XXXX-YYYY" >> .trivyignore
 
-# 3. Document in ADR
-# Create docs/adrs/ADR-011-accepted-cve-XXXX.md
+# 3. Ghi lại trong ADR
+# Tạo docs/adrs/ADR-011-accepted-cve-XXXX.md
 
-# 4. Set reminder to recheck in 30 days
+# 4. Đặt nhắc nhở kiểm tra lại sau 30 ngày
 ```
 
-**If Base Image Issue:**
+**Nếu vấn đề base image:**
 ```bash
-# Update base image in Dockerfile
+# Cập nhật base image trong Dockerfile
 # FROM python:3.11-slim  →  FROM python:3.11.8-slim
 
 docker build -t test .
-docker run --rm test python --version  # Verify
+docker run --rm test python --version  # Xác minh
 ```
 
-### Escalation
-If CRITICAL CVE with known exploit: Immediate hotfix required
+### Mức độ ưu tiên
+Nếu CVE NGHIÊM TRỌNG với exploit đã biết: Cần hotfix ngay lập tức
 
 ---
 
-## Emergency Contacts
+## Liên Hệ Khẩn Cấp
 
-| Role | Contact | Purpose |
+| Vai trò | Liên hệ | Mục đích |
 |------|---------|---------|
-| Dev Team Lead | your-email@example.com | Application issues |
-| Security Team | security@example.com | Security incidents |
-| Azure Support | Azure Portal | Infrastructure issues |
-| On-Call Rotation | PagerDuty/Slack | After-hours emergencies |
+| Trưởng nhóm Dev | your-email@example.com | Vấn đề ứng dụng |
+| Team Bảo Mật | security@example.com | Sự cố bảo mật |
+| Azure Support | Azure Portal | Vấn đề cơ sở hạ tầng |
+| Người trực | PagerDuty/Slack | Khẩn cấp ngoài giờ |
 
 ---
 
-## Monitoring Dashboard Links
+## Liên kết Dashboard Giám Sát
 
 - **Azure Monitor:** https://portal.azure.com → Monitor → Alerts
 - **Log Analytics:** https://portal.azure.com → Log Analytics workspaces
@@ -420,12 +420,12 @@ If CRITICAL CVE with known exploit: Immediate hotfix required
 
 ---
 
-## Post-Incident
+## Sau Sự Cố
 
-After resolving any security incident:
+Sau khi giải quyết bất kỳ sự cố bảo mật nào:
 
-1. ✅ Document incident in incident log
-2. ✅ Update runbook if procedures changed
-3. ✅ Schedule post-mortem within 48 hours
-4. ✅ Implement preventive measures
-5. ✅ Update monitoring/alerting as needed
+1. ✅ Ghi lại sự cố trong nhật ký sự cố
+2. ✅ Cập nhật runbook nếu quy trình thay đổi
+3. ✅ Lên lịch post-mortem trong vòng 48 giờ
+4. ✅ Triển khai các biện pháp phòng ngừa
+5. ✅ Cập nhật giám sát/cảnh báo nếu cần

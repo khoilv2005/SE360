@@ -1,50 +1,50 @@
-# Phase 1 Completion Summary
+# Tóm Tắt Hoàn Thành Phase 1
 
-## ✅ Deliverables Completed
+## ✅ Kết Quả Đã Hoàn Thành
 
-### 1.1 Threat Model Documentation
+### 1.1 Tài Liệu Mô Hình Mối Đe Dọa
 **File:** `docs/threat-model.md`
 
-**Contents:**
-- [x] DFD Level 0 (Context Diagram) - External entities and system boundary
-- [x] DFD Level 1 (Service Interactions) - 5 microservices + databases
-- [x] DFD Level 2 (Critical Flows) - Authentication, Payment, Location Tracking
-- [x] STRIDE analysis for 5 components (Ingress, UserService, PaymentService, LocationService, Databases)
-- [x] Attack surface analysis (External APIs, Service-to-service, Dependencies)
-- [x] Risk assessment matrix (Critical/High/Medium risks)
-- [x] Mitigation roadmap mapped to Phases 2-6
+**Nội dung:**
+- [x] DFD Level 0 (Sơ đồ ngữ cảnh) - Các thực thể bên ngoài và ranh giới hệ thống
+- [x] DFD Level 1 (Tương tác dịch vụ) - 5 microservices + databases
+- [x] DFD Level 2 (Luồng dữ liệu quan trọng) - Xác thực, Thanh toán, Theo dõi vị trí
+- [x] Phân tích STRIDE cho 5 thành phần (Ingress, UserService, PaymentService, LocationService, Databases)
+- [x] Phân tích bề mặt tấn công (APIs bên ngoài, Service-to-service, Dependencies)
+- [x] Ma trận đánh giá rủi ro (Rủi ro Nghiêm trọng/Cao/Trung bình)
+- [x] Lộ trình giải quyết ánh xạ đến Phases 2-6
 
-**Key Findings:**
-- 🔴 **Critical**: CosmosDB & Redis publicly accessible → Fixed in Phase 1.2
-- 🟠 **High**: No rate limiting → Phase 2
-- 🟠 **High**: Secrets not encrypted → Fixed in Phase 1.3
+**Phát hiện chính:**
+- 🔴 **Nghiêm trọng**: CosmosDB & Redis có thể truy cập công khai → Đã sửa trong Phase 1.2
+- 🟠 **Cao**: Không có giới hạn tốc độ → Phase 2
+- 🟠 **Cao**: Secrets không được mã hóa → Đã sửa trong Phase 1.3
 
 ---
 
-### 1.2 Network Security Configuration
-**Files:** 
+### 1.2 Cấu Hình Bảo Mạng Mạng
+**Files:**
 - `terraform/network-security.tf`
-- `terraform/main.tf` (updated)
-- `terraform/databases.tf` (updated)
+- `terraform/main.tf` (đã cập nhật)
+- `terraform/databases.tf` (đã cập nhật)
 
-#### Network Security Groups (NSGs)
+#### Nhóm Bảo Mạng Mạng (NSGs)
 
-**AKS Subnet NSG (`nsg-aks-prod`):**
-- ✅ Inbound: Allow 80/443 from Internet, Deny all else
-- ✅ Outbound: Allow to databases (5432, 6379, 10255, 443), Allow HTTPS to Internet, Allow Azure services
-- ✅ Zero Trust: Default deny all
+**NSG Subnet AKS (`nsg-aks-prod`):**
+- ✅ Inbound: Cho phép 80/443 từ Internet, Chặn tất cả khác
+- ✅ Outbound: Cho phép đến databases (5432, 6379, 10255, 443), Cho phép HTTPS đến Internet, Cho phép services Azure
+- ✅ Zero Trust: Chặn tất cả theo mặc định
 
-**PostgreSQL Subnet NSG (`nsg-postgres-prod`):**
-- ✅ Inbound: Allow 5432 from AKS subnet ONLY
-- ✅ Outbound: Deny all (databases don't initiate connections)
+**NSG Subnet PostgreSQL (`nsg-postgres-prod`):**
+- ✅ Inbound: Chỉ cho phép 5432 từ subnet AKS
+- ✅ Outbound: Chặn tất cả (databases không khởi tạo kết nối)
 
-**Management Subnet NSG (`nsg-management-prod`):**
-- ✅ Inbound: Allow SSH from specific IPs (to be configured)
-- ✅ Prepared for future Bastion/Jump box
+**NSG Subnet Management (`nsg-management-prod`):**
+- ✅ Inbound: Cho phép SSH từ IPs cụ thể (sẽ được cấu hình)
+- ✅ Chuẩn bị cho Bastion/Jump box tương lai
 
-#### Service Endpoints (FREE)
+#### Service Endpoints (MIỄN PHÍ)
 
-**AKS Subnet enabled endpoints:**
+**Endpoints enabled subnet AKS:**
 ```hcl
 service_endpoints = [
   "Microsoft.AzureCosmosDB",
@@ -55,12 +55,12 @@ service_endpoints = [
 ]
 ```
 
-#### Database Security Updates
+#### Cập nhật Bảo Mật Database
 
 **CosmosDB:**
 ```hcl
-public_network_access_enabled     = false  # ✅ Changed from true
-is_virtual_network_filter_enabled = true   # ✅ Enabled
+public_network_access_enabled     = false  # ✅ Thay đổi từ true
+is_virtual_network_filter_enabled = true   # ✅ Bật
 virtual_network_rule {
   id = azurerm_subnet.aks_subnet.id
 }
@@ -68,114 +68,114 @@ virtual_network_rule {
 
 **Redis:**
 ```hcl
-public_network_access_enabled = false       # ✅ Changed from true
+public_network_access_enabled = false       # ✅ Thay đổi từ true
 subnet_id                     = azurerm_subnet.aks_subnet.id
 ```
 
-**Firewall rule removed** (no longer needed with VNet integration)
+**Quy tắc firewall đã xóa** (không cần thiết với VNet integration)
 
 ---
 
-### 1.3 Kubernetes Secrets Encryption
+### 1.3 Mã Hóa Secrets Kubernetes
 **File:** `scripts/enable-k8s-encryption.sh`
 
-**Features:**
-- ✅ Enables AKS native encryption at host (FREE feature)
-- ✅ Encrypts secrets at rest automatically
-- ✅ Verification commands included
-- ✅ Instructions for pod restart
+**Tính năng:**
+- ✅ Bật mã hóa AKS native at host (tính năng MIỄN PHÍ)
+- ✅ Tự động mã hóa secrets tại rest
+- ✅ Bao gồm các lệnh xác minh
+- ✅ Hướng dẫn khởi động lại pod
 
 ---
 
-## 🎯 Measurable Outcomes Achieved
+## 🎯 Kết Quả Đo Lường Được
 
-| Metric | Before | After | Status |
-|--------|--------|-------|--------|
-| Public database endpoints | 2 (CosmosDB, Redis) | 0 | ✅ FIXED |
-| Threat components analyzed | 0 | 5 (STRIDE) | ✅ COMPLETE |
-| Network subnets | 2 | 3 (+Management) | ✅ ADDED |
-| NSG rules configured | 0 | 3 NSGs | ✅ CONFIGURED |
-| Service Endpoints enabled | No | Yes (5 services) | ✅ ENABLED |
-| Secrets encrypted at rest | No | Yes (AKS native) | ✅ ENABLED |
-| Attack surface documented | No | Yes (full analysis) | ✅ DOCUMENTED |
+| Metric | Trước | Sau | Trạng thái |
+|--------|-------|------|------------|
+| Endpoints database công khai | 2 (CosmosDB, Redis) | 0 | ✅ ĐÃ SỬA |
+| Thành phần mối đe dọa phân tích | 0 | 5 (STRIDE) | ✅ HOÀN TẤT |
+| Subnets mạng | 2 | 3 (+Management) | ✅ THÊM MỚI |
+| Quy tắc NSG cấu hình | 0 | 3 NSGs | ✅ ĐÃ CẤU HÌNH |
+| Service Endpoints bật | Không | Có (5 services) | ✅ ĐÃ BẬT |
+| Secrets mã hóa tại rest | Không | Có (AKS native) | ✅ ĐÃ BẬT |
+| Bề mặt tấn công được ghi lại | Không | Có (phân tích đầy đủ) | ✅ ĐÃ GHI LẠI |
 
 ---
 
-## 🔍 Verification Steps
+## 🔍 Các Bước Xác Minh
 
-### 1. Terraform Validation
+### 1. Xác Minh Terraform
 ```bash
 cd terraform
 terraform init
 terraform validate
-# Expected: Success!
+# Kết quả mong muốn: Thành công!
 
 terraform plan -out=tfplan
-# Review changes before applying
+# Review thay đổi trước khi áp dụng
 ```
 
-### 2. Apply Infrastructure Changes
+### 2. Áp Dụng Thay Đổi Cơ Sở Hạ Tầng
 ```bash
 terraform apply tfplan
 
-# Verify NSGs created
+# Xác minh NSGs đã tạo
 az network nsg list --resource-group rg-uitgo-prod -o table
-# Expected: 3 NSGs (aks, postgres, management)
+# Kết quả mong muốn: 3 NSGs (aks, postgres, management)
 
-# Verify Service Endpoints
+# Xác minh Service Endpoints
 az network vnet subnet show \
   --resource-group rg-uitgo-prod \
   --vnet-name vnet-uitgo-prod \
   --name snet-aks-prod \
   --query "serviceEndpoints[*].service" -o table
-# Expected: Microsoft.AzureCosmosDB, Microsoft.Cache, etc.
+# Kết quả mong muốn: Microsoft.AzureCosmosDB, Microsoft.Cache, etc.
 ```
 
-### 3. Verify Database Security
+### 3. Xác Minh Bảo Mật Database
 ```bash
-# Check CosmosDB public access (should be false)
+# Kiểm tra truy cập công khai CosmosDB (nên là false)
 az cosmosdb show \
   --name cosmos-uitgo-prod \
   --resource-group rg-uitgo-prod \
   --query "publicNetworkAccess" -o tsv
-# Expected: Disabled
+# Kết quả mong muốn: Disabled
 
-# Check Redis public access (should be false)
+# Kiểm tra truy cập công khai Redis (nên là false)
 az redis show \
   --name redis-uitgo-prod \
   --resource-group rg-uitgo-prod \
   --query "publicNetworkAccess" -o tsv
-# Expected: Disabled
+# Kết quả mong muốn: Disabled
 ```
 
-### 4. Enable K8s Secrets Encryption
+### 4. Bật Mã Hóa Secrets K8s
 ```bash
 cd scripts
 chmod +x enable-k8s-encryption.sh
 ./enable-k8s-encryption.sh
 
-# Verify encryption
+# Xác minh mã hóa
 az aks show \
   --resource-group rg-uitgo-prod \
   --name aks-uitgo-prod \
   --query "securityProfile" -o yaml
 ```
 
-### 5. Test Database Connectivity from AKS
+### 5. Kiểm Tra Kết Nối Database từ AKS
 ```bash
-# Should succeed (from within VNet)
+# Nên thành công (từ trong VNet)
 kubectl run -it --rm test --image=mongo:6 --restart=Never -- \
   mongosh "$COSMOS_CONNECTION_STRING"
 
-# Should timeout from internet (public access disabled)
-# Try connecting from your local machine - should fail
+# Nên timeout từ internet (truy cập công khai bị tắt)
+# Thử kết nối từ máy local - nên thất bại
 ```
 
 ---
 
-## 📊 Security Posture Before vs After
+## 📊 Tình Trình Bảo Mật Trước & Sau
 
-### Before Phase 1:
+### Trước Phase 1:
 ```
 Internet
    │
@@ -183,74 +183,74 @@ Internet
 NGINX Ingress
    │
    ├─── UserService ───► PostgreSQL (Private ✅)
-   ├─── TripService ───► CosmosDB (PUBLIC ❌)
-   ├─── DriverService ─► CosmosDB (PUBLIC ❌)
-   ├─── LocationSvc ───► Redis (PUBLIC ❌)
-   └─── PaymentService ► CosmosDB (PUBLIC ❌)
+   ├─── TripService ───► CosmosDB (CÔNG KHAI ❌)
+   ├─── DriverService ──► CosmosDB (CÔNG KHAI ❌)
+   ├─── LocationSvc ───► Redis (CÔNG KHAI ❌)
+   └─── PaymentService ► CosmosDB (CÔNG KHAI ❌)
 ```
 
-### After Phase 1:
+### Sau Phase 1:
 ```
 Internet
    │
    ▼
-NGINX Ingress ← Need Phase 2 for rate limiting
-   │ (NSG: Allow 80/443 only)
+NGINX Ingress ← Cần Phase 2 cho rate limiting
+   │ (NSG: Chỉ cho phép 80/443)
    │
    ├─── UserService ───► PostgreSQL (Private + NSG ✅)
    ├─── TripService ───► CosmosDB (Service Endpoint ✅)
-   ├─── DriverService ─► CosmosDB (Service Endpoint ✅)
+   ├─── DriverService ──► CosmosDB (Service Endpoint ✅)
    ├─── LocationSvc ───► Redis (VNet Integration ✅)
    └─── PaymentService ► CosmosDB (Service Endpoint ✅)
 
-All secrets encrypted at rest ✅
-NSGs block unauthorized traffic ✅
-Management subnet ready for admin access ✅
+Tất cả secrets được mã hóa tại rest ✅
+NSGs chặn traffic không được phép ✅
+Subnet management sẵn sàng cho truy cập admin ✅
 ```
 
 ---
 
-## 🚀 Next Steps: Phase 2 - Linkerd Service Mesh & mTLS
+## 🚀 Bước Tiếp Theo: Phase 2 - Linkerd Service Mesh & mTLS
 
-**What's next:**
-1. Deploy Linkerd service mesh for zero-trust communication
-2. Enable automatic mTLS between services
-3. Implement network policies for pod communication
-4. Configure observability and security policies
+**Tiếp theo:**
+1. Triển khai Linkerd service mesh cho giao tiếp zero-trust
+2. Bật mTLS tự động giữa services
+3. Triển khai network policies cho giao tiếp pod
+4. Cấu hình observability và security policies
 
-**Files to create:**
+**Files cần tạo:**
 - `k8s/linkerd-namespace.yaml`
 - `k8s/linkerd-config.yaml`
-- Update service configurations for Linkerd injection
+- Cập nhật cấu hình services cho Linkerd injection
 
-**Estimated time:** Week 3 (Phase 2)
+**Thời gian dự kiến:** Tuần 3 (Phase 2)
 
 ---
 
-## 📝 Phase 1 Statistics
+## 📝 Thống Kê Phase 1
 
-- **Files created:** 4
-- **Files modified:** 2
-- **Lines of code:** ~850 lines (Terraform + Shell + Documentation)
-- **Security improvements:** 6 major fixes
-- **Cost added:** $0 (all FREE features)
-- **Time invested:** ~2 hours
+- **Files tạo:** 4
+- **Files sửa:** 2
+- **Dòng code:** ~850 dòng (Terraform + Shell + Documentation)
+- **Cải tiến bảo mật:** 6 sửa chữa lớn
+- **Chi phí thêm:** $0 (tất cả tính năng MIỄN PHÍ)
+- **Thời gian đầu tư:** ~2 giờ
 
-**Zero Trust Principles Implemented:**
-- ✅ Network micro-segmentation (NSGs)
-- ✅ Least privilege access (database access restricted)
-- ✅ Encryption at rest (K8s secrets)
+**Nguyên tắc Zero Trust Đã Triển Khai:**
+- ✅ Phân đoạn mạng nhỏ (NSGs)
+- ✅ Truy cập đặc quyền tối thiểu (truy cập database bị hạn chế)
+- ✅ Mã hóa tại rest (Secrets K8s)
 - ✅ Zero public database endpoints
-- ✅ Service Endpoints instead of internet routing
+- ✅ Service Endpoints thay vì internet routing
 
-**Defense-in-Depth Layers Added:**
-- ✅ Layer 2: Network Security (NSGs + Service Endpoints)
-- ✅ Layer 5: Data Security (Encryption at rest)
+**Các Lớp Phòng Thủ Đa Lớp Đã Thêm:**
+- ✅ Lớp 2: Bảo mật Mạng (NSGs + Service Endpoints)
+- ✅ Lớp 5: Bảo mật Dữ liệu (Mã hóa tại rest)
 
 ---
 
-## 🎉 Phase 1 COMPLETE!
+## 🎉 PHASE 1 HOÀN TẤT!
 
-All deliverables met, measurable outcomes achieved, verification steps documented.
+Tất cả kết quả đạt được, kết quả đo lường được hoàn thành, các bước xác minh được ghi lại.
 
-**Ready to proceed to Phase 2: Linkerd Service Mesh Implementation.**
+**Sẵn sàng tiến hành Phase 2: Triển khai Linkerd Service Mesh.**
